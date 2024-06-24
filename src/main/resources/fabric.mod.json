@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "splinecart",
+	"version": "${version}",
+	"name": "Splinecart",
+	"description": "Minecart tracks that curve",
+	"authors": [
+		"FoundationGames"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/splinecart/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"io.github.foundationgames.splinecart.Splinecart"
+		],
+		"client": [
+			"io.github.foundationgames.splinecart.SplinecartClient"
+		]
+	},
+	"mixins": [
+		"splinecart.mixins.json",
+		{
+			"config": "splinecart.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.15.11",
+		"minecraft": "~1.21",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
