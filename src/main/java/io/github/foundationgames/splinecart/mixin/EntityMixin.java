@@ -29,7 +29,7 @@ public class EntityMixin {
             var endE = tie.next();
             if (endE != null) {
                 var end = endE.getPos();
-                var follower = new TrackFollowerEntity(world, start, end, self.getVelocity());
+                var follower = new TrackFollowerEntity(world, self.getPos(), start, end, self.getVelocity());
                 world.spawnEntity(follower);
                 self.startRiding(follower, true);
             }
@@ -51,7 +51,7 @@ public class EntityMixin {
                     trackFollower.getClientOrientation(rot, tickDelta);
                     rot.transform(camPos);
 
-                    info.setReturnValue(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(self.getLerpedPos(tickDelta)));
+                    info.setReturnValue(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta)));
                 }
             }
         }

@@ -39,7 +39,7 @@ public class Splinecart implements ModInitializer {
 			ComponentType.<OriginComponent>builder().codec(OriginComponent.CODEC).build());
 
 	public static final EntityType<TrackFollowerEntity> TRACK_FOLLOWER = Registry.register(Registries.ENTITY_TYPE, id("track_follower"),
-			EntityType.Builder.<TrackFollowerEntity>create(TrackFollowerEntity::new, SpawnGroup.MISC).trackingTickInterval(3).dimensions(0.25f, 0.25f).build());
+			EntityType.Builder.<TrackFollowerEntity>create(TrackFollowerEntity::new, SpawnGroup.MISC).trackingTickInterval(2).dimensions(0.25f, 0.25f).build());
 
 	public static final TagKey<EntityType<?>> CARTS = TagKey.of(RegistryKeys.ENTITY_TYPE, id("carts"));
 

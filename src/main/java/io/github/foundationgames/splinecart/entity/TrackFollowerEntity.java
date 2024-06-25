@@ -38,11 +38,13 @@ public class TrackFollowerEntity extends Entity {
     private boolean firstPositionUpdate = true;
     private boolean firstOriUpdate = true;
 
+    private Vec3d clientMotion = Vec3d.ZERO;
+
     public TrackFollowerEntity(EntityType<?> type, World world) {
         super(type, world);
     }
 
-    public TrackFollowerEntity(World world, BlockPos startTie, BlockPos endTie, Vec3d velocity) {
+    public TrackFollowerEntity(World world, Vec3d startPos, BlockPos startTie, BlockPos endTie, Vec3d velocity) {
         this(Splinecart.TRACK_FOLLOWER, world);
 
         setStretch(startTie, endTie);
@@ -50,8 +52,7 @@ public class TrackFollowerEntity extends Entity {
 
         var startE = TrackTiesBlockEntity.of(this.getWorld(), this.startTie);
         if (startE != null) {
-            var tl = startE.pose().translation();
-            this.setPosition(tl.x(), tl.y(), tl.z());
+            this.setPosition(startPos);
             this.getDataTracker().set(ORIENTATION, startE.pose().basis().getNormalizedRotation(new Quaternionf()));
         }
     }
@@ -79,6 +80,7 @@ public class TrackFollowerEntity extends Entity {
 
         var world = this.getWorld();
         if (world.isClient()) {
+            this.clientMotion = this.getPos().negate();
             if (this.positionInterpSteps > 0) {
                 this.lerpPosAndRotation(this.positionInterpSteps, this.interpX, this.interpY, this.interpZ, 0, 0);
                 this.positionInterpSteps--;
@@ -86,6 +88,7 @@ public class TrackFollowerEntity extends Entity {
                 this.refreshPosition();
                 this.setRotation(this.getYaw(), this.getPitch());
             }
+            this.clientMotion = this.clientMotion.add(this.getPos());
 
             this.lastClientOrientation.set(this.clientOrientation);
             if (this.oriInterpSteps > 0) {
@@ -98,14 +101,14 @@ public class TrackFollowerEntity extends Entity {
         } else {
             this.updateServer();
         }
-
-        if (this.hasPassengers()) {
-            this.getFirstPassenger().setYaw(0);
-        }
     }
 
     public void getClientOrientation(Quaternionf q, float tickDelta) {
         this.lastClientOrientation.slerp(this.clientOrientation, tickDelta, q);
+    }
+
+    public Vec3d getClientMotion() {
+        return this.clientMotion;
     }
 
     protected void updateServer() {
@@ -123,7 +126,7 @@ public class TrackFollowerEntity extends Entity {
                 }
 
                 this.splinePieceProgress += this.trackVelocity * this.motionScale;
-                while (this.splinePieceProgress > 1) {
+                if (this.splinePieceProgress > 1) {
                     this.splinePieceProgress -= 1;
 
                     var nextE = startE.next();
@@ -133,15 +136,15 @@ public class TrackFollowerEntity extends Entity {
                         var newVel = new Vector3d(0, 0, this.trackVelocity).mul(this.basis);
                         passenger.setVelocity(newVel.x(), newVel.y(), newVel.z());
                         this.remove(RemovalReason.KILLED);
-                        return;
                     } else {
                         this.setStretch(this.endTie, nextE.getPos());
-                        return;
                     }
+                    return;
                 }
 
                 var pos = new Vector3d();
-                startE.pose().interpolate(endE.pose(), this.splinePieceProgress, pos, this.basis);
+                var grad = new Vector3d();
+                startE.pose().interpolate(endE.pose(), this.splinePieceProgress, pos, this.basis, grad);
 
                 this.setPosition(pos.x(), pos.y(), pos.z());
                 this.getDataTracker().set(ORIENTATION, this.basis.getNormalizedRotation(new Quaternionf()));
@@ -163,12 +166,12 @@ public class TrackFollowerEntity extends Entity {
         this.interpX = x;
         this.interpY = y;
         this.interpZ = z;
-        this.positionInterpSteps = interpolationSteps + 2;
+        this.positionInterpSteps = interpolationSteps + 1;
+        this.setAngles(yaw, pitch);
     }
 
     @Override
     protected void updatePassengerPosition(Entity passenger, PositionUpdater positionUpdater) {
-        //super.updatePassengerPosition(passenger, positionUpdater);
         positionUpdater.accept(passenger, this.getX(), this.getY(), this.getZ());
     }
 

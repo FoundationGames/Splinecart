@@ -1,11 +1,13 @@
 package io.github.foundationgames.splinecart.block;
 
 import com.mojang.serialization.MapCodec;
+import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.util.Pose;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FacingBlock;
+import net.minecraft.block.ShapeContext;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemPlacementContext;
@@ -17,6 +19,8 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.AxisAngle4d;
@@ -26,6 +30,8 @@ import org.joml.Vector3d;
 public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
     public static final MapCodec<TrackTiesBlock> CODEC = createCodec(TrackTiesBlock::new);
     public static final IntProperty POINTING = IntProperty.of("pointing", 0, 3);
+
+    public static final VoxelShape[] SHAPES = new VoxelShape[Direction.values().length];
 
     public TrackTiesBlock(Settings settings) {
         super(settings);
@@ -45,6 +51,11 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
     }
 
     @Override
+    protected VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
+        return SHAPES[state.get(FACING).ordinal()];
+    }
+
+    @Override
     protected void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
         if (world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
             if (!newState.isOf(state.getBlock())) {
@@ -59,7 +70,7 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
 
     @Override
     protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        if (player.getStackInHand(Hand.MAIN_HAND).isEmpty() && world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
+        if (!player.getStackInHand(Hand.MAIN_HAND).isOf(Splinecart.TRACK) && world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
             if (tie.prev() == null && tie.next() == null) {
                 if (world.isClient()) {
                     return ActionResult.SUCCESS;
@@ -69,6 +80,8 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
                     tie.updatePose(pos, newState);
                     tie.markDirty();
                     tie.sync();
+
+                    return ActionResult.CONSUME;
                 }
             }
         }
@@ -114,5 +127,28 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
     @Override
     public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
         return new TrackTiesBlockEntity(pos, state);
+    }
+
+    static {
+        for (var dir : Direction.values()) {
+            int idx = dir.ordinal();
+            var min = new Vector3d(-8, -8, -8);
+            var max = new Vector3d(8, -6, 8);
+
+            var rot = dir.getRotationQuaternion();
+            rot.transform(min);
+            rot.transform(max);
+
+            min.add(8, 8, 8);
+            max.add(8, 8, 8);
+
+            SHAPES[idx] = createCuboidShape(
+                    Math.min(min.x(), max.x()),
+                    Math.min(min.y(), max.y()),
+                    Math.min(min.z(), max.z()),
+                    Math.max(min.x(), max.x()),
+                    Math.max(min.y(), max.y()),
+                    Math.max(min.z(), max.z()));
+        }
     }
 }
