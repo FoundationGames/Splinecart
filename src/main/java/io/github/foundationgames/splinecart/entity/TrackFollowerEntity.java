@@ -10,13 +10,17 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.joml.Matrix3d;
+import org.joml.Matrix3dc;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
 
 public class TrackFollowerEntity extends Entity {
+    private static final double COMFORTABLE_SPEED = 0.37;
+
     private BlockPos startTie;
     private BlockPos endTie;
     private double splinePieceProgress = 0; // t
@@ -65,7 +69,7 @@ public class TrackFollowerEntity extends Entity {
             this.basis.set(startE.pose().basis());
             var endE = TrackTiesBlockEntity.of(this.getWorld(), this.endTie);
             if (endE != null) {
-                // Someday: curve length calculation
+                // Initial approximation of motion scale; from the next tick onward the derivative of the track spline is used
                 this.motionScale = 1 / startE.pose().translation().distance(endE.pose().translation());
             } else {
                 this.motionScale = 1;
@@ -111,6 +115,15 @@ public class TrackFollowerEntity extends Entity {
         return this.clientMotion;
     }
 
+    public Matrix3dc getServerBasis() {
+        return this.basis;
+    }
+
+    public void destroy() {
+        this.getPassengerList().forEach(e -> e.fallDistance = 0);
+        this.remove(RemovalReason.KILLED);
+    }
+
     protected void updateServer() {
         var passenger = this.getFirstPassenger();
         if (passenger != null) {
@@ -121,7 +134,7 @@ public class TrackFollowerEntity extends Entity {
                 var startE = TrackTiesBlockEntity.of(world, this.startTie);
                 var endE = TrackTiesBlockEntity.of(world, this.endTie);
                 if (startE == null || endE == null) {
-                    this.remove(RemovalReason.KILLED);
+                    this.destroy();
                     return;
                 }
 
@@ -131,11 +144,12 @@ public class TrackFollowerEntity extends Entity {
 
                     var nextE = startE.next();
                     if (nextE == null) {
+                        this.getPassengerList().forEach(e -> e.fallDistance = 0);
                         passenger.stopRiding();
 
                         var newVel = new Vector3d(0, 0, this.trackVelocity).mul(this.basis);
                         passenger.setVelocity(newVel.x(), newVel.y(), newVel.z());
-                        this.remove(RemovalReason.KILLED);
+                        this.destroy();
                     } else {
                         this.setStretch(this.endTie, nextE.getPos());
                     }
@@ -146,12 +160,22 @@ public class TrackFollowerEntity extends Entity {
                 var grad = new Vector3d();
                 startE.pose().interpolate(endE.pose(), this.splinePieceProgress, pos, this.basis, grad);
 
+                var gravity = (getY() - pos.y()) * 0.045;
+
                 this.setPosition(pos.x(), pos.y(), pos.z());
                 this.getDataTracker().set(ORIENTATION, this.basis.getNormalizedRotation(new Quaternionf()));
+                this.motionScale = 1 / grad.length();
+
+                this.trackVelocity = MathHelper.clamp(this.trackVelocity + gravity, Math.min(this.trackVelocity, COMFORTABLE_SPEED), Math.max(this.trackVelocity, 1.2));
+                if (this.trackVelocity > COMFORTABLE_SPEED) {
+                    double diff = this.trackVelocity - COMFORTABLE_SPEED;
+                    diff *= 0.985;
+                    this.trackVelocity = COMFORTABLE_SPEED + diff;
+                }
             }
         } else {
             if (this.hadPassenger) {
-                this.remove(RemovalReason.KILLED);
+                this.destroy();
             }
         }
     }

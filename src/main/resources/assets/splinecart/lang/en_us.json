@@ -2,5 +2,10 @@
   "block.splinecart.track_ties": "Track Ties",
   "item.splinecart.track": "Track",
 
-  "entity.splinecart.track_follower": "Track Follower"
+  "entity.splinecart.track_follower": "Track Follower",
+
+  "splinecart.config.query_value": "Option '%s' is currently '%s'.",
+  "splinecart.config.set_value": "Option '%s' has been set to '%s'.",
+
+  "splinecart.config.splinecart_client.rotate_camera.desc": "Recommended to be set to 'false' for users prone to motion sickness. When set to 'false', your player camera orientation will remain level while riding a non-level Splinecart track. Non-level tracks are best experienced in third person when 'rotate_camera' is set to 'false'."
 }

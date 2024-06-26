@@ -21,7 +21,7 @@ public record Pose(Vector3dc translation, Matrix3dc basis) {
         var grad1 = new Vector3d(0, 0, 1).mul(other.basis());
 
         cubicHermiteSpline(t, factor, point0, grad0, point1, grad1, translation, gradient);
-        gradient.normalize();
+        var ngrad = gradient.normalize(new Vector3d());
 
         var rot0 = this.basis().getNormalizedRotation(new Quaterniond());
         var rot1 = other.basis().getNormalizedRotation(new Quaterniond());
@@ -30,11 +30,11 @@ public record Pose(Vector3dc translation, Matrix3dc basis) {
         basis.set(rotT);
 
         var basisGrad = new Vector3d(0, 0, 1).mul(basis);
-        var axis = gradient.cross(basisGrad, new Vector3d());
+        var axis = ngrad.cross(basisGrad, new Vector3d());
 
         if (axis.length() > 0) {
             axis.normalize();
-            double angleToNewBasis = basisGrad.angleSigned(gradient, axis);
+            double angleToNewBasis = basisGrad.angleSigned(ngrad, axis);
             if (angleToNewBasis != 0) {
                 new Matrix3d().identity().rotate(angleToNewBasis, axis)
                         .mul(basis, basis).normal();

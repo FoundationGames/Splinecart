@@ -1,5 +1,6 @@
 package io.github.foundationgames.splinecart.mixin.client;
 
+import io.github.foundationgames.splinecart.SplinecartClient;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
 import net.minecraft.client.render.Camera;
 import net.minecraft.entity.Entity;
@@ -28,7 +29,7 @@ public abstract class CameraMixin {
             var tf = vehicle.getVehicle();
             if (tf instanceof TrackFollowerEntity trackFollower) {
                 var world = self.getWorld();
-                var diff = self.getEyePos().subtract(trackFollower.getPos());
+                var diff = self.getPos().add(0, self.getStandingEyeHeight(), 0).subtract(trackFollower.getPos());
                 var camPos = new Vector3d(diff.getX(), diff.getY(), diff.getZ());
                 if (world.isClient()) {
                     var rot = new Quaternionf();
@@ -36,7 +37,10 @@ public abstract class CameraMixin {
                     rot.transform(camPos);
 
                     this.setPos(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta)));
-                    rot.mul(RotationAxis.POSITIVE_Y.rotationDegrees(90 + vehicle.getYaw(tickDelta)).mul(rotation, rotation), rotation);
+
+                    if (SplinecartClient.CFG_ROTATE_CAMERA.get()) {
+                        rot.mul(RotationAxis.POSITIVE_Y.rotationDegrees(90 + vehicle.getYaw(tickDelta)).mul(rotation, rotation), rotation);
+                    }
                 }
             }
         }

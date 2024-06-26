@@ -8,6 +8,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import org.joml.Quaternionf;
+import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,7 +34,14 @@ public class EntityRenderDispatcherMixin {
                 matrices.push();
                 onTrackFollower = true;
 
+                var dv3d = entity.getLerpedPos(tickDelta).subtract(trackFollower.getLerpedPos(tickDelta));
+                var diff = new Vector3d(dv3d.getX(), dv3d.getY(), dv3d.getZ());
+                matrices.translate(-diff.x(), -diff.y(), -diff.z());
+
                 matrices.multiply(rotation);
+
+                matrices.translate(diff.x(), diff.y(), diff.z());
+
                 matrices.multiply(RotationAxis.POSITIVE_Y.rotation((-MathHelper.HALF_PI) - yaw * MathHelper.RADIANS_PER_DEGREE));
 
                 return;

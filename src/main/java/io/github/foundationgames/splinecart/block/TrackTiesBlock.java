@@ -70,7 +70,9 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
 
     @Override
     protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        if (!player.getStackInHand(Hand.MAIN_HAND).isOf(Splinecart.TRACK) && world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
+        if (player.canModifyBlocks() &&
+                !player.getStackInHand(Hand.MAIN_HAND).isOf(Splinecart.TRACK) &&
+                world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
             if (tie.prev() == null && tie.next() == null) {
                 if (world.isClient()) {
                     return ActionResult.SUCCESS;

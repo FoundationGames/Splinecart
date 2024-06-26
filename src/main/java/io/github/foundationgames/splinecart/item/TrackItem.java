@@ -15,6 +15,10 @@ public class TrackItem extends Item {
     }
     @Override
     public ActionResult useOnBlock(ItemUsageContext context) {
+        if (context.getPlayer() != null && !context.getPlayer().canModifyBlocks()) {
+            return super.useOnBlock(context);
+        }
+
         var world = context.getWorld();
         var pos = context.getBlockPos();
         var stack = context.getStack();

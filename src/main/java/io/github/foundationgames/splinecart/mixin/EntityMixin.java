@@ -41,9 +41,8 @@ public class EntityMixin {
     private void splinecart$readjustCameraPos(float tickDelta, CallbackInfoReturnable<Vec3d> info) {
         var self = (Entity)(Object)this;
         var vehicle = self.getVehicle();
-        if (vehicle != null) {
-            var tf = vehicle.getVehicle();
-            if (tf instanceof TrackFollowerEntity trackFollower) {
+        while (vehicle != null) {
+            if (vehicle instanceof TrackFollowerEntity trackFollower) {
                 var world = self.getWorld();
                 var camPos = new Vector3d(0, self.getStandingEyeHeight(), 0);
                 if (world.isClient()) {
@@ -52,8 +51,35 @@ public class EntityMixin {
                     rot.transform(camPos);
 
                     info.setReturnValue(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta)));
+                    return;
                 }
             }
+
+            vehicle = vehicle.getVehicle();
+        }
+    }
+
+    @Inject(method = "getEyePos()Lnet/minecraft/util/math/Vec3d;", cancellable = true, at = @At("HEAD"))
+    private void splinecart$modifySuffocationCheck(CallbackInfoReturnable<Vec3d> info) {
+        var self = (Entity)(Object)this;
+        var vehicle = self.getVehicle();
+        while (vehicle != null) {
+            if (vehicle instanceof TrackFollowerEntity trackFollower) {
+                var world = self.getWorld();
+                var diff = new Vec3d(self.getX(), self.getEyeY(), self.getZ()).subtract(trackFollower.getPos());
+                var eyePos = new Vector3d(diff.getX(), diff.getY(), diff.getZ());
+                if (world.isClient()) {
+                    var rot = new Quaternionf();
+                    trackFollower.getClientOrientation(rot, 0);
+                    rot.transform(eyePos);
+                } else {
+                    trackFollower.getServerBasis().transform(eyePos);
+                }
+
+                info.setReturnValue(new Vec3d(eyePos.x(), eyePos.y(), eyePos.z()).add(trackFollower.getPos()));
+            }
+
+            vehicle = vehicle.getVehicle();
         }
     }
 }
