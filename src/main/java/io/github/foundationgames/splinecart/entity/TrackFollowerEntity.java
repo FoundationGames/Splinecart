@@ -19,8 +19,6 @@ import org.joml.Matrix3d;
 import org.joml.Matrix3dc;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
-import org.joml.Vector3dc;
-import org.joml.Vector3f;
 
 public class TrackFollowerEntity extends Entity {
     private static final double COMFORTABLE_SPEED = 0.37;
@@ -35,13 +33,11 @@ public class TrackFollowerEntity extends Entity {
     private double trackVelocity;
 
     private final Vector3d serverPosition = new Vector3d();
+    private final Vector3d serverVelocity = new Vector3d();
     private int positionInterpSteps;
     private int oriInterpSteps;
 
-    private final Vector3d clientVelocity = new Vector3d();
-
     private static final TrackedData<Quaternionf> ORIENTATION = DataTracker.registerData(TrackFollowerEntity.class, TrackedDataHandlerRegistry.QUATERNIONF);
-    private static final TrackedData<Vector3f> VELOCITY = DataTracker.registerData(TrackFollowerEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
     private final Matrix3d basis = new Matrix3d().identity();
 
     private final Quaternionf lastClientOrientation = new Quaternionf();
@@ -98,16 +94,17 @@ public class TrackFollowerEntity extends Entity {
         double t = 1 / (double)step;
 
         var clientPos = new Vector3d(this.getX(), this.getY(), this.getZ());
-        var clientVel = new Vector3d(this.clientVelocity);
 
-        var svf = getDataTracker().get(VELOCITY);
-        var serverVel = new Vector3d(svf.x(), svf.y(), svf.z());
+        var cv = this.getVelocity();
+        var clientVel = new Vector3d(cv.getX(), cv.getY(), cv.getZ());
 
         var newClientPos = new Vector3d();
-        Pose.cubicHermiteSpline(t, 1, clientPos, clientVel, this.serverPosition, serverVel,
-                newClientPos, this.clientVelocity);
+        var newClientVel = new Vector3d();
+        Pose.cubicHermiteSpline(t, 1, clientPos, clientVel, this.serverPosition, this.serverVelocity,
+                newClientPos, newClientVel);
 
         this.setPosition(newClientPos.x(), newClientPos.y(), newClientPos.z());
+        this.setVelocity(newClientVel.x(), newClientVel.y(), newClientVel.z());
     }
 
     @Override
@@ -122,7 +119,7 @@ public class TrackFollowerEntity extends Entity {
                 this.positionInterpSteps--;
             } else {
                 this.refreshPosition();
-                this.setRotation(this.getYaw(), this.getPitch());
+                this.setVelocity(this.serverVelocity.x(), this.serverVelocity.y(), this.serverVelocity.z());
             }
             this.clientMotion = this.clientMotion.add(this.getPos());
 
@@ -209,8 +206,8 @@ public class TrackFollowerEntity extends Entity {
                 this.motionScale = 1 / grad.length();
 
                 double dt = this.trackVelocity * this.motionScale; // Change in spline progress per tick
-                this.getDataTracker().set(VELOCITY, // Change in position per tick (velocity)
-                        new Vector3f((float) grad.x(), (float) grad.y(), (float) grad.z()).mul((float) dt));
+                grad.mul(dt); // Change in position per tick (velocity)
+                this.setVelocity(grad.x(), grad.y(), grad.z());
 
                 this.trackVelocity = MathHelper.clamp(
                         this.trackVelocity + gravity,
@@ -238,8 +235,14 @@ public class TrackFollowerEntity extends Entity {
         }
 
         this.serverPosition.set(x, y, z);
-        this.positionInterpSteps = interpolationSteps + 1;
+        this.positionInterpSteps = interpolationSteps + 2;
         this.setAngles(yaw, pitch);
+    }
+
+    // This method should be called updateTrackedVelocity, its usage is very similar to the above method
+    @Override
+    public void setVelocityClient(double x, double y, double z) {
+        this.serverVelocity.set(x, y, z);
     }
 
     @Override
@@ -249,8 +252,7 @@ public class TrackFollowerEntity extends Entity {
 
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
-        builder.add(ORIENTATION, new Quaternionf().identity())
-                .add(VELOCITY, new Vector3f());
+        builder.add(ORIENTATION, new Quaternionf().identity());
     }
 
     @Override
@@ -263,7 +265,7 @@ public class TrackFollowerEntity extends Entity {
                 this.clientOrientation.set(getDataTracker().get(ORIENTATION));
                 this.lastClientOrientation.set(this.clientOrientation);
             }
-            this.oriInterpSteps = this.getType().getTrackTickInterval() + 1;
+            this.oriInterpSteps = this.getType().getTrackTickInterval() + 2;
         }
     }
 
