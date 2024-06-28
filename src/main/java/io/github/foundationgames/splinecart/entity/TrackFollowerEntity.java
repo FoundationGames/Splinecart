@@ -52,6 +52,8 @@ public class TrackFollowerEntity extends Entity {
     private boolean firstPositionUpdate = true;
     private boolean firstOriUpdate = true;
 
+    private Vec3d clientMotion = Vec3d.ZERO;
+
     public TrackFollowerEntity(EntityType<?> type, World world) {
         super(type, world);
     }
@@ -114,6 +116,7 @@ public class TrackFollowerEntity extends Entity {
 
         var world = this.getWorld();
         if (world.isClient()) {
+            this.clientMotion = this.getPos().negate();
             if (this.positionInterpSteps > 0) {
                 this.interpPos(this.positionInterpSteps);
                 this.positionInterpSteps--;
@@ -121,6 +124,7 @@ public class TrackFollowerEntity extends Entity {
                 this.refreshPosition();
                 this.setRotation(this.getYaw(), this.getPitch());
             }
+            this.clientMotion = this.clientMotion.add(this.getPos());
 
             this.lastClientOrientation.set(this.clientOrientation);
             if (this.oriInterpSteps > 0) {
@@ -139,8 +143,8 @@ public class TrackFollowerEntity extends Entity {
         this.lastClientOrientation.slerp(this.clientOrientation, tickDelta, q);
     }
 
-    public Vector3dc getClientVelocity() {
-        return this.clientVelocity;
+    public Vec3d getClientMotion() {
+        return this.clientMotion;
     }
 
     public Matrix3dc getServerBasis() {
