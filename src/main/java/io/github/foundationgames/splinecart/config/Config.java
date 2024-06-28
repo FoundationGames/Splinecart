@@ -59,6 +59,18 @@ public class Config extends ArrayList<ConfigOption<?>> {
         return this.opt(new ConfigOption.BooleanOption(key, value, this));
     }
 
+    public ConfigOption.IntOption optInt(String key, int value) {
+        return this.opt(new ConfigOption.IntOption(key, value, new int[0], this));
+    }
+
+    public ConfigOption.IntOption optInt(String key, int value, int min) {
+        return this.opt(new ConfigOption.IntOption(key, value, new int[] {min}, this));
+    }
+
+    public ConfigOption.IntOption optInt(String key, int value, int min, int max) {
+        return this.opt(new ConfigOption.IntOption(key, value, new int[] {min, max}, this));
+    }
+
     public void load() throws IOException {
         var path = this.path.get();
 

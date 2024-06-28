@@ -2,6 +2,7 @@ package io.github.foundationgames.splinecart.config;
 
 import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.foundationgames.splinecart.Splinecart;
@@ -78,6 +79,42 @@ public abstract class ConfigOption<T> {
         @Override
         public <S extends CommandSource> void setFromCommandAndSave(CommandContext<S> ctx, String argName) {
             this.setAndSave(BoolArgumentType.getBool(ctx, argName));
+        }
+    }
+
+    public static class IntOption extends ConfigOption<Integer> {
+        private final int[] bounds;
+        public IntOption(String key, Integer initialValue, int[] bounds, Config owner) {
+            super(key, initialValue, owner);
+            this.bounds = bounds;
+        }
+
+        @Override
+        protected void read(Properties properties) {
+            if (properties.containsKey(this.key)) {
+                this.value = Integer.parseInt(properties.getProperty(this.key));
+            }
+        }
+
+        @Override
+        protected void write(Properties properties) {
+            properties.setProperty(this.key, Integer.toString(this.value));
+        }
+
+        @Override
+        public ArgumentType<Integer> commandArgType() {
+            if (this.bounds.length == 1) {
+                return IntegerArgumentType.integer(this.bounds[0]);
+            }
+            if (this.bounds.length == 2) {
+                return IntegerArgumentType.integer(this.bounds[0], this.bounds[1]);
+            }
+            return IntegerArgumentType.integer();
+        }
+
+        @Override
+        public <S extends CommandSource> void setFromCommandAndSave(CommandContext<S> ctx, String argName) {
+            this.setAndSave(IntegerArgumentType.getInteger(ctx, argName));
         }
     }
 }

@@ -2,9 +2,11 @@ package io.github.foundationgames.splinecart.entity;
 
 import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
+import io.github.foundationgames.splinecart.util.Pose;
 import io.github.foundationgames.splinecart.util.SUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
@@ -17,9 +19,14 @@ import org.joml.Matrix3d;
 import org.joml.Matrix3dc;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
+import org.joml.Vector3dc;
+import org.joml.Vector3f;
 
 public class TrackFollowerEntity extends Entity {
     private static final double COMFORTABLE_SPEED = 0.37;
+    private static final double MAX_SPEED = 1.28;
+    private static final double MAX_ENERGY = 2.45;
+    private static final double FRICTION = 0.986;
 
     private BlockPos startTie;
     private BlockPos endTie;
@@ -27,11 +34,14 @@ public class TrackFollowerEntity extends Entity {
     private double motionScale; // t-distance per block
     private double trackVelocity;
 
-    private double interpX, interpY, interpZ;
+    private final Vector3d serverPosition = new Vector3d();
     private int positionInterpSteps;
     private int oriInterpSteps;
 
+    private final Vector3d clientVelocity = new Vector3d();
+
     private static final TrackedData<Quaternionf> ORIENTATION = DataTracker.registerData(TrackFollowerEntity.class, TrackedDataHandlerRegistry.QUATERNIONF);
+    private static final TrackedData<Vector3f> VELOCITY = DataTracker.registerData(TrackFollowerEntity.class, TrackedDataHandlerRegistry.VECTOR3F);
     private final Matrix3d basis = new Matrix3d().identity();
 
     private final Quaternionf lastClientOrientation = new Quaternionf();
@@ -41,8 +51,6 @@ public class TrackFollowerEntity extends Entity {
 
     private boolean firstPositionUpdate = true;
     private boolean firstOriUpdate = true;
-
-    private Vec3d clientMotion = Vec3d.ZERO;
 
     public TrackFollowerEntity(EntityType<?> type, World world) {
         super(type, world);
@@ -75,7 +83,29 @@ public class TrackFollowerEntity extends Entity {
                 this.motionScale = 1;
             }
         }
-        this.splinePieceProgress = 0;
+
+        if (this.splinePieceProgress < 0) {
+            this.splinePieceProgress = 0;
+        }
+    }
+
+    // For more accurate client side position interpolation, we can conveniently use the
+    // same cubic hermite spline formula rather than linear interpolation like vanilla,
+    // since we have not only the position but also its derivative (velocity)
+    protected void interpPos(int step) {
+        double t = 1 / (double)step;
+
+        var clientPos = new Vector3d(this.getX(), this.getY(), this.getZ());
+        var clientVel = new Vector3d(this.clientVelocity);
+
+        var svf = getDataTracker().get(VELOCITY);
+        var serverVel = new Vector3d(svf.x(), svf.y(), svf.z());
+
+        var newClientPos = new Vector3d();
+        Pose.cubicHermiteSpline(t, 1, clientPos, clientVel, this.serverPosition, serverVel,
+                newClientPos, this.clientVelocity);
+
+        this.setPosition(newClientPos.x(), newClientPos.y(), newClientPos.z());
     }
 
     @Override
@@ -84,15 +114,13 @@ public class TrackFollowerEntity extends Entity {
 
         var world = this.getWorld();
         if (world.isClient()) {
-            this.clientMotion = this.getPos().negate();
             if (this.positionInterpSteps > 0) {
-                this.lerpPosAndRotation(this.positionInterpSteps, this.interpX, this.interpY, this.interpZ, 0, 0);
+                this.interpPos(this.positionInterpSteps);
                 this.positionInterpSteps--;
             } else {
                 this.refreshPosition();
                 this.setRotation(this.getYaw(), this.getPitch());
             }
-            this.clientMotion = this.clientMotion.add(this.getPos());
 
             this.lastClientOrientation.set(this.clientOrientation);
             if (this.oriInterpSteps > 0) {
@@ -111,8 +139,8 @@ public class TrackFollowerEntity extends Entity {
         this.lastClientOrientation.slerp(this.clientOrientation, tickDelta, q);
     }
 
-    public Vec3d getClientMotion() {
-        return this.clientMotion;
+    public Vector3dc getClientVelocity() {
+        return this.clientVelocity;
     }
 
     public Matrix3dc getServerBasis() {
@@ -120,11 +148,19 @@ public class TrackFollowerEntity extends Entity {
     }
 
     public void destroy() {
-        this.getPassengerList().forEach(e -> e.fallDistance = 0);
         this.remove(RemovalReason.KILLED);
     }
 
+    @Override
+    public boolean handleFallDamage(float fallDistance, float damageMultiplier, DamageSource damageSource) {
+        return false;
+    }
+
     protected void updateServer() {
+        for (var passenger : this.getPassengerList()) {
+            passenger.fallDistance = 0;
+        }
+
         var passenger = this.getFirstPassenger();
         if (passenger != null) {
             if (!hadPassenger) {
@@ -138,38 +174,48 @@ public class TrackFollowerEntity extends Entity {
                     return;
                 }
 
-                this.splinePieceProgress += this.trackVelocity * this.motionScale;
+                double velocity = Math.min(this.trackVelocity, MAX_SPEED);
+                this.splinePieceProgress += velocity * this.motionScale;
                 if (this.splinePieceProgress > 1) {
                     this.splinePieceProgress -= 1;
 
-                    var nextE = startE.next();
+                    var nextE = endE.next();
                     if (nextE == null) {
-                        this.getPassengerList().forEach(e -> e.fallDistance = 0);
                         passenger.stopRiding();
 
                         var newVel = new Vector3d(0, 0, this.trackVelocity).mul(this.basis);
                         passenger.setVelocity(newVel.x(), newVel.y(), newVel.z());
                         this.destroy();
+                        return;
                     } else {
                         this.setStretch(this.endTie, nextE.getPos());
+                        startE = endE;
+                        endE = nextE;
                     }
-                    return;
                 }
 
                 var pos = new Vector3d();
-                var grad = new Vector3d();
+                var grad = new Vector3d(); // Change in position per change in spline progress
                 startE.pose().interpolate(endE.pose(), this.splinePieceProgress, pos, this.basis, grad);
 
-                var gravity = (getY() - pos.y()) * 0.045;
+                var gravity = (getY() - pos.y()) * 0.047;
 
                 this.setPosition(pos.x(), pos.y(), pos.z());
                 this.getDataTracker().set(ORIENTATION, this.basis.getNormalizedRotation(new Quaternionf()));
                 this.motionScale = 1 / grad.length();
 
-                this.trackVelocity = MathHelper.clamp(this.trackVelocity + gravity, Math.min(this.trackVelocity, COMFORTABLE_SPEED), Math.max(this.trackVelocity, 1.2));
+                double dt = this.trackVelocity * this.motionScale; // Change in spline progress per tick
+                this.getDataTracker().set(VELOCITY, // Change in position per tick (velocity)
+                        new Vector3f((float) grad.x(), (float) grad.y(), (float) grad.z()).mul((float) dt));
+
+                this.trackVelocity = MathHelper.clamp(
+                        this.trackVelocity + gravity,
+                        Math.min(this.trackVelocity, COMFORTABLE_SPEED),
+                        Math.max(this.trackVelocity, MAX_ENERGY));
+
                 if (this.trackVelocity > COMFORTABLE_SPEED) {
                     double diff = this.trackVelocity - COMFORTABLE_SPEED;
-                    diff *= 0.985;
+                    diff *= FRICTION;
                     this.trackVelocity = COMFORTABLE_SPEED + diff;
                 }
             }
@@ -187,9 +233,7 @@ public class TrackFollowerEntity extends Entity {
             super.updateTrackedPositionAndAngles(x, y, z, yaw, pitch, interpolationSteps);
         }
 
-        this.interpX = x;
-        this.interpY = y;
-        this.interpZ = z;
+        this.serverPosition.set(x, y, z);
         this.positionInterpSteps = interpolationSteps + 1;
         this.setAngles(yaw, pitch);
     }
@@ -201,7 +245,8 @@ public class TrackFollowerEntity extends Entity {
 
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
-        builder.add(ORIENTATION, new Quaternionf().identity());
+        builder.add(ORIENTATION, new Quaternionf().identity())
+                .add(VELOCITY, new Vector3f());
     }
 
     @Override
@@ -214,7 +259,7 @@ public class TrackFollowerEntity extends Entity {
                 this.clientOrientation.set(getDataTracker().get(ORIENTATION));
                 this.lastClientOrientation.set(this.clientOrientation);
             }
-            this.oriInterpSteps = this.getType().getTrackTickInterval() + 2;
+            this.oriInterpSteps = this.getType().getTrackTickInterval() + 1;
         }
     }
 

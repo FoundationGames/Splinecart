@@ -2,10 +2,18 @@
   "block.splinecart.track_ties": "Track Ties",
   "item.splinecart.track": "Track",
 
+  "item.splinecart.track_ties.desc": "Interact to rotate when placed",
+  "item.splinecart.track.desc": "Links two Track Ties blocks together",
+
+  "item.splinecart.track.origin": "First track selected",
+  "item.splinecart.track.clear_hint": "Cancel first selection by using on a non-track block",
+
   "entity.splinecart.track_follower": "Track Follower",
 
   "splinecart.config.query_value": "Option '%s' is currently '%s'.",
   "splinecart.config.set_value": "Option '%s' has been set to '%s'.",
 
-  "splinecart.config.splinecart_client.rotate_camera.desc": "Recommended to be set to 'false' for users prone to motion sickness. When set to 'false', your player camera orientation will remain level while riding a non-level Splinecart track. Non-level tracks are best experienced in third person when 'rotate_camera' is set to 'false'."
+  "splinecart.config.splinecart_client.rotate_camera.desc": "Recommended to be set to 'false' for users prone to motion sickness. When set to 'false', your player camera orientation will remain level while riding a non-level Splinecart track. Non-level tracks are best experienced in third person when 'rotate_camera' is set to 'false'.",
+  "splinecart.config.splinecart_client.track_resolution.desc": "Higher values decrease performance and increase visual quality. Determines how many segments tracks will be cut into when rendering, with fewer segments making tracks appear jagged. Does not affect minecart movement along tracks.",
+  "splinecart.config.splinecart_client.track_render_distance.desc": "When the origin track tie block is this many chunks away from you, its track will stop rendering."
 }

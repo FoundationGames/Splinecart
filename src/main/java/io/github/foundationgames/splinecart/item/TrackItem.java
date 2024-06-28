@@ -4,10 +4,15 @@ import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.github.foundationgames.splinecart.component.OriginComponent;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+
+import java.util.List;
 
 public class TrackItem extends Item {
     public TrackItem(Settings settings) {
@@ -53,5 +58,15 @@ public class TrackItem extends Item {
         }
 
         return super.useOnBlock(context);
+    }
+
+    @Override
+    public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType type) {
+        super.appendTooltip(stack, context, tooltip, type);
+
+        var origin = stack.get(Splinecart.ORIGIN_POS);
+        if (origin != null) {
+            origin.appendTooltip(context, tooltip::add, type);
+        }
     }
 }

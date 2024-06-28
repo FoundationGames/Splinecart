@@ -1,6 +1,7 @@
 package io.github.foundationgames.splinecart.block.entity;
 
 import io.github.foundationgames.splinecart.Splinecart;
+import io.github.foundationgames.splinecart.SplinecartClient;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.github.foundationgames.splinecart.util.Pose;
 import net.minecraft.client.MinecraftClient;
@@ -54,16 +55,17 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
 
             matrices.translate(-pos.getX(), -pos.getY(), -pos.getZ());
 
-            int segs = 3 * Math.max((int) start.translation().distance(end.translation()), 2);
+            int segs = SplinecartClient.CFG_TRACK_RESOLUTION.get() * Math.max((int) start.translation().distance(end.translation()), 2);
             var origin = new Vector3d(start.translation());
             var basis = new Matrix3d(start.basis());
             var grad = new Vector3d(0, 0, 1).mul(start.basis());
+            double[] totalDist = {0};
 
             for (int i = 0; i < segs; i++) {
                 double t0 = (double)i / segs;
                 double t1 = (double)(i + 1) / segs;
 
-                renderPart(world, matrices.peek(), buffer, start, end, t0, t1, origin, basis, grad, overlay);
+                renderPart(world, matrices.peek(), buffer, start, end, t0, t1, totalDist, origin, basis, grad, overlay);
             }
 
             matrices.pop();
@@ -118,6 +120,11 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         return true;
     }
 
+    @Override
+    public int getRenderDistance() {
+        return SplinecartClient.CFG_TRACK_RENDER_DISTANCE.get() * 16;
+    }
+
     private void renderDebug(Pose pose, MatrixStack.Entry entry, VertexConsumer buffer) {
         var posMat = entry.getPositionMatrix();
         for (int x = 0; x < 3; x++) {
@@ -141,7 +148,7 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
     }
 
     private void renderPart(World world, MatrixStack.Entry entry, VertexConsumer buffer, Pose start, Pose end,
-                            double t0, double t1, Vector3d origin0, Matrix3d basis0, Vector3d grad0, int overlay) {
+                            double t0, double t1, double[] blockProgress, Vector3d origin0, Matrix3d basis0, Vector3d grad0, int overlay) {
         start.interpolate(end, t0, origin0, basis0, grad0);
         var norm0 = new Vector3d(0, 1, 0).mul(basis0);
 
@@ -150,6 +157,15 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         var grad1 = new Vector3d(grad0);
         start.interpolate(end, t1, origin1, basis1, grad1);
         var norm1 = new Vector3d(0, 1, 0).mul(basis1);
+
+        float v0 = (float) blockProgress[0];
+        while (v0 > 1) v0 -= 1;
+        float v1 = v0 + (float) (grad0.length() * (t1 - t0));
+
+        blockProgress[0] = v1;
+
+        v1 = 1 - v1;
+        v0 = 1 - v0;
 
         var pos0 = new BlockPos(MathHelper.floor(origin0.x()), MathHelper.floor(origin0.y()), MathHelper.floor(origin0.z()));
         var pos1 = new BlockPos(MathHelper.floor(origin1.x()), MathHelper.floor(origin1.y()), MathHelper.floor(origin1.z()));
@@ -160,13 +176,13 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         var point = new Vector3f();
 
         point.set(0.5, 0, 0).mul(basis0).add((float) origin0.x(), (float) origin0.y(), (float) origin0.z());
-        buffer.vertex(entry, point).color(WHITE).texture(1, 1).overlay(overlay).light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
+        buffer.vertex(entry, point).color(WHITE).texture(0, v0).overlay(overlay).light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
         point.set(-0.5, 0, 0).mul(basis0).add((float) origin0.x(), (float) origin0.y(), (float) origin0.z());
-        buffer.vertex(entry, point).color(WHITE).texture(0, 1).overlay(overlay).light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
+        buffer.vertex(entry, point).color(WHITE).texture(1, v0).overlay(overlay).light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
 
         point.set(-0.5, 0, 0).mul(basis1).add((float) origin1.x(), (float) origin1.y(), (float) origin1.z());
-        buffer.vertex(entry, point).color(WHITE).texture(0, 0).overlay(overlay).light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
+        buffer.vertex(entry, point).color(WHITE).texture(1, v1).overlay(overlay).light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
         point.set(0.5, 0, 0).mul(basis1).add((float) origin1.x(), (float) origin1.y(), (float) origin1.z());
-        buffer.vertex(entry, point).color(WHITE).texture(1, 0).overlay(overlay).light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
+        buffer.vertex(entry, point).color(WHITE).texture(0, v1).overlay(overlay).light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
     }
 }

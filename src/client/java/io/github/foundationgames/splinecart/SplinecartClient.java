@@ -22,6 +22,8 @@ public class SplinecartClient implements ClientModInitializer {
 					.resolve("splinecart").resolve("splinecart_client.properties"));
 
 	public static final ConfigOption.BooleanOption CFG_ROTATE_CAMERA = CONFIG.optBool("rotate_camera", true);
+	public static final ConfigOption.IntOption CFG_TRACK_RESOLUTION = CONFIG.optInt("track_resolution", 3, 1, 16);
+	public static final ConfigOption.IntOption CFG_TRACK_RENDER_DISTANCE = CONFIG.optInt("track_render_distance", 8, 4, 32);
 
 	@Override
 	public void onInitializeClient() {

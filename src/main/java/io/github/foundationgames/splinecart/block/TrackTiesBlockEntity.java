@@ -65,24 +65,22 @@ public class TrackTiesBlockEntity extends BlockEntity {
             var oldNextE = next();
             this.next = null;
             if (oldNextE != null) {
-                this.dropTrack();
-
                 oldNextE.prev = null;
-                oldNextE.markDirty();
                 oldNextE.sync();
+                oldNextE.markDirty();
             }
         } else {
             this.next = pos;
             var nextE = next();
             if (nextE != null) {
                 nextE.prev = getPos();
-                nextE.markDirty();
                 nextE.sync();
+                nextE.markDirty();
             }
         }
 
-        markDirty();
         sync();
+        markDirty();
     }
 
     public @Nullable TrackTiesBlockEntity next() {
@@ -98,38 +96,41 @@ public class TrackTiesBlockEntity extends BlockEntity {
     }
 
     public void onDestroy() {
+        if (this.prev != null) {
+            this.dropTrack();
+        }
+        if (this.next != null) {
+            this.dropTrack();
+        }
+
         var prevE = prev();
         if (prevE != null) {
             prevE.next = null;
-            prevE.markDirty();
             prevE.sync();
+            prevE.markDirty();
         }
-
-        this.setNext(null);
+        var nextE = next();
+        if (nextE != null) {
+            nextE.prev = null;
+            nextE.sync();
+            nextE.markDirty();
+        }
     }
 
     @Override
     protected void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         super.readNbt(nbt, registryLookup);
 
-        if (nbt.contains("prev")) {
-            this.prev = SUtil.getBlockPos(nbt, "prev");
-        } else this.prev = null;
-        if (nbt.contains("next")) {
-            this.next = SUtil.getBlockPos(nbt, "next");
-        } else this.next = null;
+        this.prev = SUtil.getBlockPos(nbt, "prev");
+        this.next = SUtil.getBlockPos(nbt, "next");
     }
 
     @Override
     protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         super.writeNbt(nbt, registryLookup);
 
-        if (this.prev != null) {
-            SUtil.putBlockPos(nbt, this.prev, "prev");
-        }
-        if (this.next != null) {
-            SUtil.putBlockPos(nbt, this.next, "next");
-        }
+        SUtil.putBlockPos(nbt, this.prev, "prev");
+        SUtil.putBlockPos(nbt, this.next, "next");
     }
 
     @Nullable

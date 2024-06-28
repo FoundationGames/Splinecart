@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "A": {
+      "item": "minecraft:stick"
+    },
+    "B": {
+      "tag": "minecraft:wooden_slabs"
+    }
+  },
+  "pattern": [
+    "B B",
+    "BAB",
+    "B B"
+  ],
+  "result": {
+    "count": 8,
+    "id": "splinecart:track_ties"
+  }
+}
