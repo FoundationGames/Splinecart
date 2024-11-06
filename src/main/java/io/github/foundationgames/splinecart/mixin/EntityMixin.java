@@ -25,11 +25,9 @@ public class EntityMixin {
         }
 
         var start = self.getBlockPos();
-        if (world.getBlockEntity(start) instanceof TrackTiesBlockEntity tie) {
-            var endE = tie.next();
-            if (endE != null) {
-                var end = endE.getPos();
-                var follower = new TrackFollowerEntity(world, self.getPos(), start, end, self.getVelocity());
+        if (world.getBlockEntity(start) instanceof TrackTiesBlockEntity) {
+            var follower = TrackFollowerEntity.create(world, self.getPos(), start, self.getVelocity());
+            if (follower != null) {
                 world.spawnEntity(follower);
                 self.startRiding(follower, true);
             }

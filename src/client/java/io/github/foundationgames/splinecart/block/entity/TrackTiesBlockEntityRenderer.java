@@ -24,7 +24,9 @@ import org.joml.Vector3f;
 
 public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTiesBlockEntity> {
     public static final int WHITE = 0xFFFFFFFF;
+    public static final Vector3f WHITEF = new Vector3f(1, 1, 1);
     public static final Identifier TRACK_TEXTURE = Splinecart.id("textures/track.png");
+    public static final Identifier TRACK_OVERLAY_TEXTURE = Splinecart.id("textures/track_overlay.png");
     public static final Identifier POSE_TEXTURE_DEBUG = Splinecart.id("textures/debug.png");
 
     public TrackTiesBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {
@@ -34,6 +36,8 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
     public void render(TrackTiesBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
         var start = entity.pose();
         var pos = entity.getPos();
+
+        entity.clientTime += tickDelta;
 
         if (MinecraftClient.getInstance().getDebugHud().shouldShowDebugHud()) {
             matrices.push();
@@ -46,6 +50,7 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         }
 
         var buffer = vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(getTexture()));
+        boolean reinitBuffer = false;
         var nextE = entity.next();
         if (nextE != null) {
             var end = nextE.pose();
@@ -54,6 +59,11 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
             matrices.push();
 
             matrices.translate(-pos.getX(), -pos.getY(), -pos.getZ());
+
+            var trackType = entity.nextType();
+
+            float u0 = trackType.textureU * 0.25f;
+            float u1 = u0 + 0.25f;
 
             int segs = SplinecartClient.CFG_TRACK_RESOLUTION.get() * Math.max((int) start.translation().distance(end.translation()), 2);
             var origin = new Vector3d(start.translation());
@@ -65,7 +75,24 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
                 double t0 = (double)i / segs;
                 double t1 = (double)(i + 1) / segs;
 
-                renderPart(world, matrices.peek(), buffer, start, end, t0, t1, totalDist, origin, basis, grad, overlay);
+                renderPart(world, matrices.peek(), buffer, start, end, u0, u1, 0, WHITEF, t0, t1, totalDist, origin, basis, grad, overlay);
+            }
+
+            if (trackType.overlay != null) {
+                reinitBuffer = true;
+                var olBuffer = vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(getTrackOverlayTexture()));
+
+                float[] olVOffset = {0};
+                Vector3f olColor = new Vector3f(WHITEF);
+                int power = Math.max(entity.power(), nextE.power());
+                trackType.overlay.calculateEffects(power, entity.clientTime, olColor, olVOffset);
+
+                for (int i = 0; i < segs; i++) {
+                    double t0 = (double)i / segs;
+                    double t1 = (double)(i + 1) / segs;
+
+                    renderPart(world, matrices.peek(), olBuffer, start, end, u0, u1, olVOffset[0], olColor, t0, t1, totalDist, origin, basis, grad, overlay);
+                }
             }
 
             matrices.pop();
@@ -73,6 +100,10 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
 
         var prevE = entity.prev();
         if ((prevE == null) ^ (nextE == null)) {
+            if (reinitBuffer) {
+                buffer = vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(getTexture()));
+            }
+
             float z0 = -0.5f;
             float z1 = 0;
             float v0 = 1;
@@ -101,11 +132,11 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
 
             matrices.translate(0, -0.4375, 0);
 
-            buffer.vertex(entry, 0.5f, 0, z0).color(WHITE).texture(1, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);
+            buffer.vertex(entry, 0.5f, 0, z0).color(WHITE).texture(0.25f, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);
             buffer.vertex(entry, -0.5f, 0, z0).color(WHITE).texture(0, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);
 
             buffer.vertex(entry, -0.5f, 0, z1).color(WHITE).texture(0, v1).overlay(overlay).light(light).normal(entry, 0, 1, 0);
-            buffer.vertex(entry, 0.5f, 0, z1).color(WHITE).texture(1, v1).overlay(overlay).light(light).normal(entry, 0, 1, 0);
+            buffer.vertex(entry, 0.5f, 0, z1).color(WHITE).texture(0.25f, v1).overlay(overlay).light(light).normal(entry, 0, 1, 0);
 
             matrices.pop();
         }
@@ -113,6 +144,10 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
 
     protected Identifier getTexture() {
         return TRACK_TEXTURE;
+    }
+
+    protected Identifier getTrackOverlayTexture() {
+        return TRACK_OVERLAY_TEXTURE;
     }
 
     @Override
@@ -148,7 +183,8 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
     }
 
     private void renderPart(World world, MatrixStack.Entry entry, VertexConsumer buffer, Pose start, Pose end,
-                            double t0, double t1, double[] blockProgress, Vector3d origin0, Matrix3d basis0, Vector3d grad0, int overlay) {
+                            float u0, float u1, float vOffset, Vector3f color, double t0, double t1, double[] blockProgress,
+                            Vector3d origin0, Matrix3d basis0, Vector3d grad0, int overlay) {
         start.interpolate(end, t0, origin0, basis0, grad0);
         var norm0 = new Vector3d(0, 1, 0).mul(basis0);
 
@@ -164,8 +200,8 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
 
         blockProgress[0] = v1;
 
-        v1 = 1 - v1;
-        v0 = 1 - v0;
+        v1 = 1 - v1 + vOffset;
+        v0 = 1 - v0 + vOffset;
 
         var pos0 = new BlockPos(MathHelper.floor(origin0.x()), MathHelper.floor(origin0.y()), MathHelper.floor(origin0.z()));
         var pos1 = new BlockPos(MathHelper.floor(origin1.x()), MathHelper.floor(origin1.y()), MathHelper.floor(origin1.z()));
@@ -176,13 +212,17 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         var point = new Vector3f();
 
         point.set(0.5, 0, 0).mul(basis0).add((float) origin0.x(), (float) origin0.y(), (float) origin0.z());
-        buffer.vertex(entry, point).color(WHITE).texture(0, v0).overlay(overlay).light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
+        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u0, v0).overlay(overlay)
+                .light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
         point.set(-0.5, 0, 0).mul(basis0).add((float) origin0.x(), (float) origin0.y(), (float) origin0.z());
-        buffer.vertex(entry, point).color(WHITE).texture(1, v0).overlay(overlay).light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
+        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u1, v0).overlay(overlay)
+                .light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
 
         point.set(-0.5, 0, 0).mul(basis1).add((float) origin1.x(), (float) origin1.y(), (float) origin1.z());
-        buffer.vertex(entry, point).color(WHITE).texture(1, v1).overlay(overlay).light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
+        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u1, v1).overlay(overlay)
+                .light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
         point.set(0.5, 0, 0).mul(basis1).add((float) origin1.x(), (float) origin1.y(), (float) origin1.z());
-        buffer.vertex(entry, point).color(WHITE).texture(0, v1).overlay(overlay).light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
+        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u0, v1).overlay(overlay)
+                .light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
     }
 }

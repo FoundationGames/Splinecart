@@ -3,19 +3,22 @@
   "category": "misc",
   "key": {
     "A": {
-      "item": "minecraft:rail"
+      "item": "minecraft:powered_rail"
     },
     "B": {
       "item": "minecraft:iron_block"
+    },
+    "C": {
+      "item": "minecraft:copper_block"
     }
   },
   "pattern": [
-    "B",
-    "A",
-    "B"
+    " B ",
+    "CAC",
+    " B "
   ],
   "result": {
     "count": 4,
-    "id": "splinecart:track"
+    "id": "splinecart:magnetic_track"
   }
 }

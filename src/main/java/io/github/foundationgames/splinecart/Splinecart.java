@@ -39,8 +39,16 @@ public class Splinecart implements ModInitializer {
 			BlockEntityType.Builder.create(TrackTiesBlockEntity::new, TRACK_TIES).build());
 
 	public static final TrackItem TRACK = Registry.register(Registries.ITEM, id("track"),
-			new TrackItem(new Item.Settings().component(DataComponentTypes.LORE,
+			new TrackItem(TrackType.DEFAULT, new Item.Settings().component(DataComponentTypes.LORE,
 					lore(Text.translatable("item.splinecart.track.desc").formatted(Formatting.GRAY))
+			)));
+	public static final TrackItem CHAIN_DRIVE_TRACK = Registry.register(Registries.ITEM, id("chain_drive_track"),
+			new TrackItem(TrackType.CHAIN_DRIVE, new Item.Settings().component(DataComponentTypes.LORE,
+					lore(Text.translatable("item.splinecart.chain_drive_track.desc").formatted(Formatting.GRAY))
+			)));
+	public static final TrackItem MAGNETIC_TRACK = Registry.register(Registries.ITEM, id("magnetic_track"),
+			new TrackItem(TrackType.MAGNETIC, new Item.Settings().component(DataComponentTypes.LORE,
+					lore(Text.translatable("item.splinecart.magnetic_track.desc").formatted(Formatting.GRAY))
 			)));
 
 	public static final ComponentType<OriginComponent> ORIGIN_POS = Registry.register(Registries.DATA_COMPONENT_TYPE, id("origin"),
@@ -62,6 +70,8 @@ public class Splinecart implements ModInitializer {
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.REDSTONE).register(entries -> {
 			entries.add(tieItem.getDefaultStack());
 			entries.add(TRACK.getDefaultStack());
+			entries.add(CHAIN_DRIVE_TRACK.getDefaultStack());
+			entries.add(MAGNETIC_TRACK.getDefaultStack());
 		});
 	}
 

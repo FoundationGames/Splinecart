@@ -2,6 +2,7 @@ package io.github.foundationgames.splinecart.block;
 
 import com.mojang.serialization.MapCodec;
 import io.github.foundationgames.splinecart.Splinecart;
+import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.Pose;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockEntityProvider;
@@ -69,9 +70,18 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
     }
 
     @Override
+    protected void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, BlockPos sourcePos, boolean notify) {
+        super.neighborUpdate(state, world, pos, sourceBlock, sourcePos, notify);
+
+        if (world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
+            tie.updatePower();
+        }
+    }
+
+    @Override
     protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
         if (player.canModifyBlocks() &&
-                !player.getStackInHand(Hand.MAIN_HAND).isOf(Splinecart.TRACK) &&
+                !(player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof TrackItem) &&
                 world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
             if (tie.prev() == null && tie.next() == null) {
                 if (world.isClient()) {

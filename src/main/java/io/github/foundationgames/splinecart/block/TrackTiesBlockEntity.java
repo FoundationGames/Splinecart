@@ -1,6 +1,8 @@
 package io.github.foundationgames.splinecart.block;
 
 import io.github.foundationgames.splinecart.Splinecart;
+import io.github.foundationgames.splinecart.TrackType;
+import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.Pose;
 import io.github.foundationgames.splinecart.util.SUtil;
 import net.minecraft.block.BlockState;
@@ -20,9 +22,16 @@ import org.joml.Matrix3d;
 import org.joml.Vector3d;
 
 public class TrackTiesBlockEntity extends BlockEntity {
+    public float clientTime = 0;
+
+    private TrackType nextType = TrackType.DEFAULT;
+    private TrackType prevType = TrackType.DEFAULT;
+
     private BlockPos next;
     private BlockPos prev;
     private Pose pose;
+
+    private int power = -1;
 
     public TrackTiesBlockEntity(BlockPos pos, BlockState state) {
         super(Splinecart.TRACK_TIES_BE, pos, state);
@@ -52,15 +61,15 @@ public class TrackTiesBlockEntity extends BlockEntity {
         return null;
     }
 
-    private void dropTrack() {
+    private void dropTrack(TrackType type) {
         var world = getWorld();
         var pos = Vec3d.ofCenter(getPos());
-        var item = new ItemEntity(world, pos.getX(), pos.getY(), pos.getZ(), new ItemStack(Splinecart.TRACK));
+        var item = new ItemEntity(world, pos.getX(), pos.getY(), pos.getZ(), new ItemStack(TrackItem.ITEMS_BY_TYPE.get(type)));
 
         world.spawnEntity(item);
     }
 
-    public void setNext(@Nullable BlockPos pos) {
+    public void setNext(@Nullable BlockPos pos, @Nullable TrackType type) {
         if (pos == null) {
             var oldNextE = next();
             this.next = null;
@@ -71,9 +80,15 @@ public class TrackTiesBlockEntity extends BlockEntity {
             }
         } else {
             this.next = pos;
+            if (type != null) {
+                this.nextType = type;
+            }
             var nextE = next();
             if (nextE != null) {
                 nextE.prev = getPos();
+                if (type != null) {
+                    nextE.prevType = type;
+                }
                 nextE.sync();
                 nextE.markDirty();
             }
@@ -91,16 +106,50 @@ public class TrackTiesBlockEntity extends BlockEntity {
         return of(this.getWorld(), this.prev);
     }
 
+    public @Nullable BlockPos nextPos() {
+        return next;
+    }
+
+    public @Nullable BlockPos prevPos() {
+        return prev;
+    }
+
+    public TrackType nextType() {
+        return this.nextType;
+    }
+
+    public TrackType prevType() {
+        return this.prevType;
+    }
+
     public Pose pose() {
         return this.pose;
     }
 
+    public void updatePower() {
+        int oldPower = this.power;
+        this.power = getWorld().getReceivedRedstonePower(getPos());
+
+        if (oldPower != this.power) {
+            sync();
+            markDirty();
+        }
+    }
+
+    public int power() {
+        if (this.power < 0) {
+            updatePower();
+        }
+
+        return this.power;
+    }
+
     public void onDestroy() {
         if (this.prev != null) {
-            this.dropTrack();
+            this.dropTrack(this.prevType);
         }
         if (this.next != null) {
-            this.dropTrack();
+            this.dropTrack(this.nextType);
         }
 
         var prevE = prev();
@@ -123,6 +172,11 @@ public class TrackTiesBlockEntity extends BlockEntity {
 
         this.prev = SUtil.getBlockPos(nbt, "prev");
         this.next = SUtil.getBlockPos(nbt, "next");
+
+        this.prevType = TrackType.read(nbt.getInt("prev_id"));
+        this.nextType = TrackType.read(nbt.getInt("next_id"));
+
+        this.power = nbt.getInt("power");
     }
 
     @Override
@@ -131,6 +185,11 @@ public class TrackTiesBlockEntity extends BlockEntity {
 
         SUtil.putBlockPos(nbt, this.prev, "prev");
         SUtil.putBlockPos(nbt, this.next, "next");
+
+        nbt.putInt("prev_id", this.prevType.write());
+        nbt.putInt("next_id", this.nextType.write());
+
+        nbt.putInt("power", this.power);
     }
 
     @Nullable

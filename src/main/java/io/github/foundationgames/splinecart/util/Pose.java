@@ -1,6 +1,5 @@
 package io.github.foundationgames.splinecart.util;
 
-import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3d;
 import org.joml.Matrix3dc;
 import org.joml.Quaterniond;
@@ -43,15 +42,13 @@ public record Pose(Vector3dc translation, Matrix3dc basis) {
     }
 
     public static Vector3d cubicHermiteSpline(double t, double factor, Vector3dc p0, Vector3dc m0, Vector3dc p1, Vector3dc m1,
-                                              Vector3d pOut, @Nullable Vector3d mOut) {
+                                              Vector3d pOut, Vector3d mOut) {
         var temp = new Vector3d();
         var diff = new Vector3d(p1).sub(p0);
 
-        if (mOut != null) {
-            mOut.set(temp.set(diff).mul(6*t - 6*t*t))
-                    .add(temp.set(m0).mul(3*t*t - 4*t + 1).mul(factor))
-                    .add(temp.set(m1).mul(3*t*t - 2*t).mul(factor));
-        }
+        mOut.set(temp.set(diff).mul(6*t - 6*t*t))
+                .add(temp.set(m0).mul(3*t*t - 4*t + 1).mul(factor))
+                .add(temp.set(m1).mul(3*t*t - 2*t).mul(factor));
 
         return pOut.set(p0)
                 .add(temp.set(m0).mul(t*t*t - 2*t*t + t).mul(factor))

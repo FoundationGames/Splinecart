@@ -1,9 +1,13 @@
 {
   "block.splinecart.track_ties": "Track Ties",
   "item.splinecart.track": "Track",
+  "item.splinecart.chain_drive_track": "Chain Drive Track",
+  "item.splinecart.magnetic_track": "Magnetic Track",
 
   "item.splinecart.track_ties.desc": "Interact to rotate when placed",
   "item.splinecart.track.desc": "Links two Track Ties blocks together",
+  "item.splinecart.chain_drive_track.desc": "Track variant that pulls minecarts",
+  "item.splinecart.magnetic_track.desc": "Track variant that accelerates or slows minecarts",
 
   "item.splinecart.track.origin": "First track selected",
   "item.splinecart.track.clear_hint": "Cancel first selection by using on a non-track block",
