@@ -1,11 +1,16 @@
 package io.github.foundationgames.splinecart.util;
 
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
+
+import java.util.function.BiFunction;
 
 public enum SUtil {;
     public static final Vector3f[] REDSTONE_COLOR_LUT = Util.make(new Vector3f[16], colors -> {
@@ -30,5 +35,10 @@ public enum SUtil {;
         if (arr.length < 3) return null;
 
         return new BlockPos(arr[0], arr[1], arr[2]);
+    }
+
+    public static <V, T extends V> T register(Registry<V> registry, Identifier id, BiFunction<Identifier, RegistryKey<V>, T> obj) {
+        RegistryKey<V> key = RegistryKey.of(registry.getKey(), id);
+        return Registry.register(registry, id, obj.apply(id, key));
     }
 }

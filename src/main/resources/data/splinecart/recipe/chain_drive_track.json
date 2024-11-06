@@ -2,15 +2,9 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "key": {
-    "A": {
-      "item": "minecraft:activator_rail"
-    },
-    "B": {
-      "item": "minecraft:iron_block"
-    },
-    "C": {
-      "item": "minecraft:chain"
-    }
+    "A": "minecraft:activator_rail",
+    "B": "minecraft:iron_block",
+    "C": "minecraft:chain"
   },
   "pattern": [
     " B ",

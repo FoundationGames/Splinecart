@@ -2,12 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "key": {
-    "A": {
-      "item": "minecraft:rail"
-    },
-    "B": {
-      "item": "minecraft:iron_block"
-    }
+    "A": "minecraft:rail",
+    "B": "minecraft:iron_block"
   },
   "pattern": [
     "B",
