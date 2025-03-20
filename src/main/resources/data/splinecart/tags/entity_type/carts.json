@@ -6,10 +6,6 @@
     "minecraft:furnace_minecart",
     "minecraft:hopper_minecart",
     "minecraft:tnt_minecart",
-    "minecraft:spawner_minecart",
-    {
-      "required": false,
-      "id": "customizablecarts:customizable_minecart"
-    }
+    "minecraft:spawner_minecart"
   ]
 }
