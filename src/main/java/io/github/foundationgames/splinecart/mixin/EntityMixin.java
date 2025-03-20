@@ -1,8 +1,10 @@
 package io.github.foundationgames.splinecart.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
+import io.github.foundationgames.splinecart.util.SUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Quaternionf;
@@ -34,27 +36,57 @@ public class EntityMixin {
         }
     }
 
-    @Inject(method = "getCameraPosVec(F)Lnet/minecraft/util/math/Vec3d;",
-            at = @At("RETURN"), cancellable = true)
-    private void splinecart$readjustCameraPos(float tickDelta, CallbackInfoReturnable<Vec3d> info) {
+    @ModifyReturnValue(method = "getRotationVector(FF)Lnet/minecraft/util/math/Vec3d;", at = @At("RETURN"))
+    private Vec3d splinecart$readjustRotationVec(Vec3d old) {
         var self = (Entity)(Object)this;
         var vehicle = self.getVehicle();
         while (vehicle != null) {
             if (vehicle instanceof TrackFollowerEntity trackFollower) {
                 var world = self.getWorld();
-                var camPos = new Vector3d(0, self.getStandingEyeHeight(), 0);
+
+                var rotVec = new Vector3d(old.getX(), old.getY(), old.getZ());
+                SUtil.BACKWARDS.transform(rotVec);
+
+                if (world.isClient()) {
+                    var rot = new Quaternionf();
+                    float tickDelta = (float) SUtil.TICK_DELTA.getAsDouble();
+                    trackFollower.getClientOrientation(rot, tickDelta);
+                    rot.transform(rotVec);
+                } else {
+                    trackFollower.getServerBasis().transform(rotVec);
+                }
+
+                return new Vec3d(rotVec.x(), rotVec.y(), rotVec.z());
+            }
+
+            vehicle = vehicle.getVehicle();
+        }
+
+        return old;
+    }
+
+    @ModifyReturnValue(method = "getCameraPosVec(F)Lnet/minecraft/util/math/Vec3d;", at = @At("RETURN"))
+    private Vec3d splinecart$readjustCameraPos(Vec3d old, float tickDelta) {
+        var self = (Entity)(Object)this;
+        var vehicle = self.getVehicle();
+        while (vehicle != null) {
+            if (vehicle instanceof TrackFollowerEntity trackFollower) {
+                var world = self.getWorld();
+                var diff = self.getPos().add(0, self.getStandingEyeHeight(), 0).subtract(trackFollower.getPos());
+                var camPos = new Vector3d(diff.getX(), diff.getY(), diff.getZ());
                 if (world.isClient()) {
                     var rot = new Quaternionf();
                     trackFollower.getClientOrientation(rot, tickDelta);
                     rot.transform(camPos);
 
-                    info.setReturnValue(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta)));
-                    return;
+                    return new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta));
                 }
             }
 
             vehicle = vehicle.getVehicle();
         }
+
+        return old;
     }
 
     @Inject(method = "getEyePos()Lnet/minecraft/util/math/Vec3d;", cancellable = true, at = @At("HEAD"))

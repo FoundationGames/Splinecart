@@ -2,6 +2,7 @@ package io.github.foundationgames.splinecart.mixin.client;
 
 import io.github.foundationgames.splinecart.SplinecartClient;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.RotationAxis;
@@ -20,6 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class CameraMixin {
     @Shadow protected abstract void setPos(Vec3d pos);
     @Shadow @Final private Quaternionf rotation;
+    @Shadow private Entity focusedEntity;
 
     @Inject(method = "update(Lnet/minecraft/world/BlockView;Lnet/minecraft/entity/Entity;ZZF)V",
             at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lnet/minecraft/client/render/Camera;setPos(DDD)V"))
@@ -37,6 +39,24 @@ public abstract class CameraMixin {
                     rot.transform(camPos);
 
                     this.setPos(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta)));
+                }
+            }
+        }
+    }
+
+    @Inject(method = "setRotation(FF)V",
+            at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;"))
+    private void splinecart$updateCamRotationWhileRiding(float yaw, float pitch, CallbackInfo info) {
+        var self = this.focusedEntity;
+        var vehicle = self.getVehicle();
+        var tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
+        if (vehicle != null) {
+            var tf = vehicle.getVehicle();
+            if (tf instanceof TrackFollowerEntity trackFollower) {
+                var world = self.getWorld();
+                if (world.isClient()) {
+                    var rot = new Quaternionf();
+                    trackFollower.getClientOrientation(rot, tickDelta);
 
                     if (SplinecartClient.CFG_ROTATE_CAMERA.get()) {
                         rot.mul(RotationAxis.POSITIVE_Y.rotationDegrees(90 + vehicle.getYaw(tickDelta)).mul(rotation, rotation), rotation);

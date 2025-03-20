@@ -6,6 +6,7 @@ import io.github.foundationgames.splinecart.component.OriginComponent;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
 import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.SUtil;
+import io.github.foundationgames.splinecart.util.TrackProgress;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
@@ -17,6 +18,7 @@ import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LoreComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroups;
@@ -75,6 +77,8 @@ public class Splinecart implements ModInitializer {
 			entries.add(CHAIN_DRIVE_TRACK.getDefaultStack());
 			entries.add(MAGNETIC_TRACK.getDefaultStack());
 		});
+
+		TrackedDataHandlerRegistry.register(TrackProgress.DATA_HANDLER);
 	}
 
 	public static LoreComponent lore(Text lore) {

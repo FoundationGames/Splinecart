@@ -1,13 +1,12 @@
 package io.github.foundationgames.splinecart.mixin.client;
 
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
+import io.github.foundationgames.splinecart.util.SUtil;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRenderDispatcher;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -42,9 +41,7 @@ public class EntityRenderDispatcherMixin {
                 matrices.multiply(rotation);
 
                 matrices.translate(diff.x(), diff.y(), diff.z());
-
-                float yaw = entity.getYaw(tickDelta);
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotation((-MathHelper.HALF_PI) - yaw * MathHelper.RADIANS_PER_DEGREE));
+                matrices.multiply(SUtil.BACKWARDS);
 
                 return;
             }

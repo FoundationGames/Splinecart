@@ -4,12 +4,15 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import io.github.foundationgames.splinecart.block.entity.TrackTiesBlockEntityRenderer;
 import io.github.foundationgames.splinecart.config.Config;
 import io.github.foundationgames.splinecart.config.ConfigOption;
+import io.github.foundationgames.splinecart.util.SUtil;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
 import net.minecraft.client.render.entity.EmptyEntityRenderer;
@@ -27,6 +30,8 @@ public class SplinecartClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		SUtil.TICK_DELTA = () -> MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
+
 		try {
 			CONFIG.load();
 		} catch (IOException e) {
@@ -44,5 +49,7 @@ public class SplinecartClient implements ClientModInitializer {
 							.then(CONFIG.command(LiteralArgumentBuilder.literal("config"),
 									FabricClientCommandSource::sendFeedback))
 		));
+
+		HudRenderCallback.EVENT.register(new SplinecartHud());
 	}
 }

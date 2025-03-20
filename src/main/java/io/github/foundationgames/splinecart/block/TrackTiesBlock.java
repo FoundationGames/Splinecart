@@ -1,7 +1,6 @@
 package io.github.foundationgames.splinecart.block;
 
 import com.mojang.serialization.MapCodec;
-import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.Pose;
 import net.minecraft.block.Block;

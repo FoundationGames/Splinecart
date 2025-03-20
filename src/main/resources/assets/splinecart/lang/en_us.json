@@ -14,6 +14,10 @@
 
   "entity.splinecart.track_follower": "Track Follower",
 
+  "hud.splinecart.cancel": "[Cancel]",
+  "hud.splinecart.create_track": "[Create Track]",
+  "hud.splinecart.right_click": "%s: %s",
+
   "splinecart.config.query_value": "Option '%s' is currently '%s'.",
   "splinecart.config.set_value": "Option '%s' has been set to '%s'.",
 

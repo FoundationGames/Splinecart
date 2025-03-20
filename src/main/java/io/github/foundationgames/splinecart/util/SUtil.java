@@ -7,10 +7,13 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.function.BiFunction;
+import java.util.function.DoubleSupplier;
 
 public enum SUtil {;
     public static final Vector3f[] REDSTONE_COLOR_LUT = Util.make(new Vector3f[16], colors -> {
@@ -23,6 +26,9 @@ public enum SUtil {;
             );
         }
     });
+
+    public static final Quaternionf BACKWARDS = RotationAxis.POSITIVE_Y.rotation(MathHelper.PI);
+    public static DoubleSupplier TICK_DELTA = () -> 0;
 
     public static void putBlockPos(NbtCompound nbt, @Nullable BlockPos pos, String key) {
         if (pos == null) {

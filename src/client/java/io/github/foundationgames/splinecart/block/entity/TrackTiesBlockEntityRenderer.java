@@ -184,19 +184,19 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
 
     private void renderPart(World world, MatrixStack.Entry entry, VertexConsumer buffer, Pose start, Pose end,
                             float u0, float u1, float vOffset, Vector3f color, double t0, double t1, double[] blockProgress,
-                            Vector3d origin0, Matrix3d basis0, Vector3d grad0, int overlay) {
-        start.interpolate(end, t0, origin0, basis0, grad0);
+                            Vector3d origin0, Matrix3d basis0, Vector3d deriv0, int overlay) {
+        start.interpolate(end, t0, origin0, basis0, deriv0);
         var norm0 = new Vector3d(0, 1, 0).mul(basis0);
 
         var origin1 = new Vector3d(origin0);
         var basis1 = new Matrix3d(basis0);
-        var grad1 = new Vector3d(grad0);
-        start.interpolate(end, t1, origin1, basis1, grad1);
+        var deriv1 = new Vector3d(deriv0);
+        start.interpolate(end, t1, origin1, basis1, deriv1);
         var norm1 = new Vector3d(0, 1, 0).mul(basis1);
 
         float v0 = (float) blockProgress[0];
         while (v0 > 1) v0 -= 1;
-        float v1 = v0 + (float) (grad0.length() * (t1 - t0));
+        float v1 = v0 + (float) (deriv0.length() * (t1 - t0));
 
         blockProgress[0] = v1;
 
