@@ -2,9 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "key": {
-    "A": "minecraft:powered_rail",
-    "B": "minecraft:iron_block",
-    "C": "minecraft:copper_block"
+    "A": {
+      "item": "minecraft:powered_rail"
+    },
+    "B": {
+      "item": "minecraft:iron_block"
+    },
+    "C": {
+      "item": "minecraft:copper_block"
+    }
   },
   "pattern": [
     " B ",

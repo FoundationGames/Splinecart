@@ -42,9 +42,4 @@ public enum SUtil {;
 
         return new BlockPos(arr[0], arr[1], arr[2]);
     }
-
-    public static <V, T extends V> T register(Registry<V> registry, Identifier id, BiFunction<Identifier, RegistryKey<V>, T> obj) {
-        RegistryKey<V> key = RegistryKey.of(registry.getKey(), id);
-        return Registry.register(registry, id, obj.apply(id, key));
-    }
 }
