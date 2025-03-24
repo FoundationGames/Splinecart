@@ -2,6 +2,7 @@ package io.github.foundationgames.splinecart.mixin.client;
 
 import io.github.foundationgames.splinecart.SplinecartClient;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
+import io.github.foundationgames.splinecart.util.SUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.entity.Entity;
@@ -38,6 +39,10 @@ public abstract class CameraMixin {
                     trackFollower.getClientOrientation(rot, tickDelta);
                     rot.transform(camPos);
 
+                    if (SUtil.failsSanityCheck(camPos)) {
+                        return;
+                    }
+
                     this.setPos(new Vec3d(camPos.x(), camPos.y(), camPos.z()).add(trackFollower.getLerpedPos(tickDelta)));
                 }
             }
@@ -45,7 +50,7 @@ public abstract class CameraMixin {
     }
 
     @Inject(method = "setRotation(FF)V",
-            at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;"))
+            at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;", remap = false))
     private void splinecart$updateCamRotationWhileRiding(float yaw, float pitch, CallbackInfo info) {
         var self = this.focusedEntity;
         var vehicle = self.getVehicle();
@@ -57,6 +62,10 @@ public abstract class CameraMixin {
                 if (world.isClient()) {
                     var rot = new Quaternionf();
                     trackFollower.getClientOrientation(rot, tickDelta);
+
+                    if (SUtil.failsSanityCheck(rot)) {
+                        return;
+                    }
 
                     if (SplinecartClient.CFG_ROTATE_CAMERA.get()) {
                         rot.mul(RotationAxis.POSITIVE_Y.rotationDegrees(90 + vehicle.getYaw(tickDelta)).mul(rotation, rotation), rotation);

@@ -22,6 +22,7 @@
   "splinecart.config.set_value": "Option '%s' has been set to '%s'.",
 
   "splinecart.config.splinecart_client.rotate_camera.desc": "Recommended to be set to 'false' for users prone to motion sickness. When set to 'false', your player camera orientation will remain level while riding a non-level Splinecart track. Non-level tracks are best experienced in third person when 'rotate_camera' is set to 'false'.",
+  "splinecart.config.splinecart_client.vbos.desc": "Use vertex buffer objects to render tracks. Drastically increases performance when enabled, however prone to visual artifacts and compatibility issues.",
   "splinecart.config.splinecart_client.track_resolution.desc": "Higher values decrease performance and increase visual quality. Determines how many segments tracks will be cut into when rendering, with fewer segments making tracks appear jagged. Does not affect minecart movement along tracks.",
   "splinecart.config.splinecart_client.track_render_distance.desc": "When the origin track tie block is this many chunks away from you, its track will stop rendering."
 }

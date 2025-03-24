@@ -10,6 +10,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
+import org.joml.Vector3dc;
 import org.joml.Vector3f;
 
 import java.util.function.BiFunction;
@@ -41,5 +42,18 @@ public enum SUtil {;
         if (arr.length < 3) return null;
 
         return new BlockPos(arr[0], arr[1], arr[2]);
+    }
+
+    public static <V, T extends V> T register(Registry<V> registry, Identifier id, BiFunction<Identifier, RegistryKey<V>, T> obj) {
+        RegistryKey<V> key = RegistryKey.of(registry.getKey(), id);
+        return Registry.register(registry, id, obj.apply(id, key));
+    }
+
+    public static boolean failsSanityCheck(Vector3dc vec) {
+        return Double.isNaN(vec.x()) || Double.isNaN(vec.y()) || Double.isNaN(vec.z());
+    }
+
+    public static boolean failsSanityCheck(Quaternionf rot) {
+        return Double.isNaN(rot.x()) || Double.isNaN(rot.y()) || Double.isNaN(rot.z()) || Double.isNaN(rot.w());
     }
 }
