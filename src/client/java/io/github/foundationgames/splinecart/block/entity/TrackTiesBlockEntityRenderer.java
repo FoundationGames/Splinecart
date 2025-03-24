@@ -4,6 +4,7 @@ import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.SplinecartClient;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.github.foundationgames.splinecart.util.Pose;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
@@ -15,6 +16,8 @@ import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import org.joml.Vector3f;
+
+import java.util.Set;
 
 public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTiesBlockEntity> {
     public static final int WHITE = 0xFFFFFFFF;
@@ -51,11 +54,11 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         matrices.translate(-pos.getX(), -pos.getY(), -pos.getZ());
 
         if (!(entity.geometry instanceof ClientTrackGeometry geo &&
-                geo.render(matrices, overlayBuf, () -> RenderLayer.getEntityCutoutNoCull(getTexture()),
+                geo.render(matrices, overlayBuf, () -> RenderLayer.getEntityCutoutNoCullZOffset(getTexture()),
                         light, overlay, segs, entity, prevE, nextE)
         )) {
             TrackRenderer.renderTrack(matrices.peek(), matrices.peek(),
-                    TrackRenderer.immediateBuf(vertexConsumers, getTexture(), RenderLayer::getEntityCutoutNoCull),
+                    TrackRenderer.immediateBuf(vertexConsumers, getTexture(), RenderLayer::getEntityCutoutNoCullZOffset),
                     overlayBuf,
                     overlay, light, segs, entity, prevE, nextE);
         }
@@ -101,5 +104,13 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
         buffer.vertex(entry, 1, 0, 0).color(WHITE).texture(0, 1)
                 .overlay(OverlayTexture.DEFAULT_UV).light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
                 .normal(entry, 0, 1, 0);
+    }
+
+    public static void queueVboRebuildsForChunkUpdate(int sectionX, int sectionY, int sectionZ, Set<BlockEntity> blockEntities) {
+        for (var be : blockEntities) if (be instanceof TrackTiesBlockEntity ties) {
+            if (ties.geometry.isInChunk(sectionX, sectionY, sectionZ)) {
+                ties.geometry.needsRebuild = true;
+            }
+        }
     }
 }

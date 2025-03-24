@@ -26,7 +26,7 @@ public abstract class MinecartInsideSoundInstanceMixin extends MovingSoundInstan
     @Inject(method = "tick", at = @At("TAIL"))
     private void splinecart$adjustSoundWhenOnTrack(CallbackInfo info) {
         if (!this.isDone() && minecart.getVehicle() instanceof TrackFollowerEntity trackFollower) {
-            float amp = (float) trackFollower.getClientMotion().length();
+            float amp = trackFollower.getClientMotion().length();
             this.volume = MathHelper.clamp(amp, 0, 0.75f);
         }
     }

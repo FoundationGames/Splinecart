@@ -9,6 +9,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -19,6 +20,7 @@ import org.joml.Matrix3d;
 import org.joml.Matrix3dc;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
+import org.joml.Vector3f;
 
 public class TrackFollowerEntity extends Entity {
     public static final double FRICTION = 0.997;
@@ -39,6 +41,7 @@ public class TrackFollowerEntity extends Entity {
     private int progInterpSteps;
 
     private static final TrackedData<TrackProgress> TRACK_PROGRESS = DataTracker.registerData(TrackFollowerEntity.class, TrackProgress.DATA_HANDLER);
+    public static final TrackedData<Vector3f> TRACK_MOTION = DataTracker.registerData(TrackFollowerEntity.class, TrackedDataHandlerRegistry.VECTOR_3F);
     private final Matrix3d basis = new Matrix3d().identity();
 
     private TrackProgress lastClientTrackProgress = TrackProgress.empty(getPos());
@@ -51,8 +54,6 @@ public class TrackFollowerEntity extends Entity {
 
     private boolean firstPositionUpdate = true;
     private boolean firstProgUpdate = true;
-
-    private Vec3d clientMotion = Vec3d.ZERO;
 
     public TrackFollowerEntity(EntityType<?> type, World world) {
         super(type, world);
@@ -127,8 +128,6 @@ public class TrackFollowerEntity extends Entity {
                 passenger.setHeadYaw(90);
             }
 
-            this.clientMotion = this.getPos().negate();
-
             if (this.positionInterpSteps > 0) {
                 this.interpPosOnly(this.positionInterpSteps);
                 this.positionInterpSteps--;
@@ -151,8 +150,6 @@ public class TrackFollowerEntity extends Entity {
             if (updatePos) {
                 this.setPosition(clientPos.x(), clientPos.y(), clientPos.z());
             }
-
-            this.clientMotion = this.clientMotion.add(this.getPos());
         } else {
             this.updateServer();
         }
@@ -162,8 +159,8 @@ public class TrackFollowerEntity extends Entity {
         this.lastClientOrientation.slerp(this.clientOrientation, tickDelta, q);
     }
 
-    public Vec3d getClientMotion() {
-        return this.clientMotion;
+    public Vector3f getClientMotion() {
+        return this.dataTracker.get(TRACK_MOTION);
     }
 
     public Matrix3dc getServerBasis() {
@@ -213,6 +210,8 @@ public class TrackFollowerEntity extends Entity {
                     return;
                 }
 
+                var motion = new Vector3f((float) -getX(), (float) -getY(), (float) -getZ());
+
                 this.splinePieceProgress += this.trackVelocity * this.motionScale;
                 if (this.splinePieceProgress > 1) {
                     this.splinePieceProgress -= 1;
@@ -248,8 +247,8 @@ public class TrackFollowerEntity extends Entity {
                 this.getDataTracker().set(TRACK_PROGRESS, TrackProgress.of(startE, this.splinePieceProgress));
 
                 double derivScale = deriv.length();
-                if (derivScale != 0) {
-                    this.motionScale = 1 / deriv.length();
+                if (derivScale >= 0.0000001) {
+                    this.motionScale = 1 / derivScale;
                 }
 
                 var heading = new Vector3d(deriv).normalize();
@@ -258,6 +257,9 @@ public class TrackFollowerEntity extends Entity {
                 double dt = this.trackVelocity * this.motionScale; // Change in spline progress per tick
                 deriv.mul(dt); // Change in position per tick (velocity)
                 this.setVelocity(deriv.x(), deriv.y(), deriv.z());
+
+                motion.add((float) getX(), (float) getY(), (float) getZ());
+                this.dataTracker.set(TRACK_MOTION, motion);
 
                 var passengerVel = passenger.getVelocity();
                 var push = new Vector3d(passengerVel.getX(), 0.0, passengerVel.getZ());
@@ -303,6 +305,7 @@ public class TrackFollowerEntity extends Entity {
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
         builder.add(TRACK_PROGRESS, TrackProgress.empty(getPos()));
+        builder.add(TRACK_MOTION, new Vector3f());
     }
 
     @Override

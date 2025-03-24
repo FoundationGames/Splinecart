@@ -8,9 +8,12 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlUsage;
 import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.gl.VertexBuffer;
+import net.minecraft.client.render.Fog;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.ChunkSectionPos;
+import org.joml.Matrix4f;
 
 import java.util.function.Supplier;
 
@@ -42,6 +45,17 @@ public class ClientTrackGeometry extends TrackGeometry {
             vbo = new VertexBuffer(GlUsage.STATIC_WRITE);
             trackBuffer = TrackRenderer.vboBuf(vbo, Tessellator.getInstance());
 
+            this.resetBounds();
+            var currSec = ChunkSectionPos.from(curr.getPos());
+            var nextSec = nextE != null ? ChunkSectionPos.from(nextE.getPos()) : currSec;
+
+            this.minSectionX = Math.min(currSec.getX(), nextSec.getX());
+            this.minSectionY = Math.min(currSec.getY(), nextSec.getY());
+            this.minSectionZ = Math.min(currSec.getZ(), nextSec.getZ());
+            this.maxSectionX = Math.max(currSec.getX(), nextSec.getX());
+            this.maxSectionY = Math.max(currSec.getY(), nextSec.getY());
+            this.maxSectionZ = Math.max(currSec.getZ(), nextSec.getZ());
+
             this.needsRebuild = false;
         }
 
@@ -63,21 +77,21 @@ public class ClientTrackGeometry extends TrackGeometry {
             layer.startDrawing();
 
             matrices.push();
+            var fog = RenderSystem.getShaderFog();
+            RenderSystem.setShaderFog(new Fog(0, 999999999, fog.shape(), fog.red(), fog.green(), fog.blue(), fog.alpha()));
 
-            var cam = MinecraftClient.getInstance().gameRenderer.getCamera();
-
-            matrices.translate(cam.getPos());
-            matrices.multiply(cam.getRotation().invert());
-            matrices.translate(cam.getPos().negate());
+            var posMatrix = new Matrix4f().set(RenderSystem.getModelViewMatrix());
+            posMatrix.mul(matrices.peek().getPositionMatrix());
 
             matrices.push();
             this.vbo.bind();
-            this.vbo.draw(matrices.peek().getPositionMatrix(), RenderSystem.getProjectionMatrix(),
-                    MinecraftClient.getInstance().getShaderLoader().getOrCreateProgram(ShaderProgramKeys.RENDERTYPE_ENTITY_CUTOUT_NO_CULL));
+            this.vbo.draw(posMatrix, RenderSystem.getProjectionMatrix(),
+                    MinecraftClient.getInstance().getShaderLoader().getOrCreateProgram(ShaderProgramKeys.RENDERTYPE_ENTITY_CUTOUT_NO_CULL_Z_OFFSET));
             VertexBuffer.unbind();
             matrices.pop();
 
             matrices.pop();
+            RenderSystem.setShaderFog(fog);
             layer.endDrawing();
         }
 

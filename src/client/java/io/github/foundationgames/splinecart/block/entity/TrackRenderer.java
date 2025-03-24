@@ -121,7 +121,8 @@ public enum TrackRenderer {;
             matrices.peek().getNormalMatrix().set(transform.getNormalMatrix());
             matrices.peek().getPositionMatrix().set(transform.getPositionMatrix());
 
-            matrices.translate(0.5, 0.5, 0.5);
+            var tl = pose.translation();
+            matrices.translate(tl.x(), tl.y(), tl.z());
 
             var entry = matrices.peek();
             var posMat = entry.getPositionMatrix();
@@ -132,8 +133,6 @@ public enum TrackRenderer {;
                     nmlMat.setRowColumn(x, y, (float) pose.basis().getRowColumn(x, y));
                 }
             }
-
-            matrices.translate(0, -0.4375, 0);
 
             buffer.vertex(entry, 0.5f, 0, z0).color(TrackTiesBlockEntityRenderer.WHITE).texture(0.25f, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);
             buffer.vertex(entry, -0.5f, 0, z0).color(TrackTiesBlockEntityRenderer.WHITE).texture(0, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);

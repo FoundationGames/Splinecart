@@ -48,7 +48,29 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
     @Nullable
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
-        return getDefaultState().with(FACING, ctx.getSide());
+        var side = ctx.getSide();
+        var hdir = ctx.getHorizontalPlayerFacing();
+        int rot;
+
+        switch (side) {
+            case DOWN -> rot = Math.floorMod(2 + hdir.getHorizontal(), 4);
+            case UP -> rot = Math.floorMod(2 - hdir.getHorizontal(), 4);
+            default -> {
+                int hos = Math.floorMod(2 + hdir.getOpposite().getHorizontal() - side.getHorizontal(), 4) - 2;
+                if (hos == 0) {
+                    var player = ctx.getPlayer();
+                    float pitch = 0;
+                    if (player != null) {
+                        pitch = player.getPitch();
+                    }
+                    rot = pitch <= 0 ? 2 : 0;
+                } else {
+                    rot = hos > 0 ? 1 : 3;
+                }
+            }
+        }
+
+        return getDefaultState().with(FACING, ctx.getSide()).with(POINTING, rot);
     }
 
     @Override
