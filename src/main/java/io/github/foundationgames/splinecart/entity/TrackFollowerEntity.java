@@ -241,23 +241,23 @@ public class TrackFollowerEntity extends Entity {
                 }
 
                 var pos = new Vector3d();
-                var grad = new Vector3d(); // Change in position per change in spline progress
-                startE.pose().interpolate(endE.pose(), this.splinePieceProgress, pos, this.basis, grad);
+                var deriv = new Vector3d(); // Change in position per change in spline progress
+                startE.pose().interpolate(endE.pose(), this.splinePieceProgress, pos, this.basis, deriv);
 
                 this.setPosition(pos.x(), pos.y(), pos.z());
                 this.getDataTracker().set(TRACK_PROGRESS, TrackProgress.of(startE, this.splinePieceProgress));
 
-                double gradLen = grad.length();
-                if (gradLen != 0) {
-                    this.motionScale = 1 / grad.length();
+                double derivScale = deriv.length();
+                if (derivScale != 0) {
+                    this.motionScale = 1 / deriv.length();
                 }
 
-                var ngrad = new Vector3d(grad).normalize();
-                var gravity = -ngrad.y() * GRAVITY;
+                var heading = new Vector3d(deriv).normalize();
+                var gravity = -heading.y() * GRAVITY;
 
                 double dt = this.trackVelocity * this.motionScale; // Change in spline progress per tick
-                grad.mul(dt); // Change in position per tick (velocity)
-                this.setVelocity(grad.x(), grad.y(), grad.z());
+                deriv.mul(dt); // Change in position per tick (velocity)
+                this.setVelocity(deriv.x(), deriv.y(), deriv.z());
 
                 var passengerVel = passenger.getVelocity();
                 var push = new Vector3d(passengerVel.getX(), 0.0, passengerVel.getZ());

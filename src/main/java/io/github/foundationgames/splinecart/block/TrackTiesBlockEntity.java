@@ -23,6 +23,7 @@ import org.joml.Vector3d;
 
 public class TrackTiesBlockEntity extends BlockEntity {
     public float clientTime = 0;
+    public final TrackGeometry geometry;
 
     private TrackType nextType = TrackType.DEFAULT;
     private TrackType prevType = TrackType.DEFAULT;
@@ -36,6 +37,8 @@ public class TrackTiesBlockEntity extends BlockEntity {
     public TrackTiesBlockEntity(BlockPos pos, BlockState state) {
         super(Splinecart.TRACK_TIES_BE, pos, state);
         updatePose(pos, state);
+
+        this.geometry = TrackGeometry.CONSTRUCTOR.apply(this);
     }
 
     public void updatePose(BlockPos pos, BlockState state) {
@@ -75,8 +78,7 @@ public class TrackTiesBlockEntity extends BlockEntity {
             this.next = null;
             if (oldNextE != null) {
                 oldNextE.prev = null;
-                oldNextE.sync();
-                oldNextE.markDirty();
+                oldNextE.setUpdated();
             }
         } else {
             this.next = pos;
@@ -89,13 +91,11 @@ public class TrackTiesBlockEntity extends BlockEntity {
                 if (type != null) {
                     nextE.prevType = type;
                 }
-                nextE.sync();
-                nextE.markDirty();
+                nextE.setUpdated();
             }
         }
 
-        sync();
-        markDirty();
+        setUpdated();
     }
 
     public @Nullable TrackTiesBlockEntity next() {
@@ -131,8 +131,7 @@ public class TrackTiesBlockEntity extends BlockEntity {
         this.power = getWorld().getReceivedRedstonePower(getPos());
 
         if (oldPower != this.power) {
-            sync();
-            markDirty();
+            setUpdated();
         }
     }
 
@@ -155,14 +154,37 @@ public class TrackTiesBlockEntity extends BlockEntity {
         var prevE = prev();
         if (prevE != null) {
             prevE.next = null;
-            prevE.sync();
-            prevE.markDirty();
+            prevE.setUpdated();
         }
         var nextE = next();
         if (nextE != null) {
             nextE.prev = null;
-            nextE.sync();
-            nextE.markDirty();
+            nextE.setUpdated();
+        }
+    }
+
+    public double estimatedTrackLength() {
+        var nextE = next();
+        if (nextE == null) {
+            return 0;
+        }
+
+        return Math.sqrt(nextE.getPos().getSquaredDistance(this.getPos()));
+    }
+
+    @Override
+    public void markRemoved() {
+        super.markRemoved();
+
+        this.geometry.close();
+    }
+
+    public void setUpdated() {
+        sync();
+        markDirty();
+
+        if (getWorld().isClient()) {
+            this.geometry.needsRebuild = true;
         }
     }
 
@@ -177,6 +199,8 @@ public class TrackTiesBlockEntity extends BlockEntity {
         this.nextType = TrackType.read(nbt.getInt("next_id"));
 
         this.power = nbt.getInt("power");
+
+        this.geometry.needsRebuild = true;
     }
 
     @Override
