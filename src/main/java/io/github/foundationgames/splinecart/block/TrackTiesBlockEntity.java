@@ -133,6 +133,11 @@ public class TrackTiesBlockEntity extends BlockEntity {
         if (oldPower != this.power) {
             setUpdated();
         }
+
+        var prev = prev();
+        if (prev != null) {
+            prev.geometry.needsRebuild = true;
+        }
     }
 
     public int power() {

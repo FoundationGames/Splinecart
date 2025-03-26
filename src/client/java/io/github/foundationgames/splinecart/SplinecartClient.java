@@ -15,9 +15,18 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.Defines;
+import net.minecraft.client.gl.ShaderProgramKey;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.RenderPhase;
+import net.minecraft.client.render.VertexFormat;
+import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
 import net.minecraft.client.render.entity.EmptyEntityRenderer;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.TriState;
+import net.minecraft.util.Util;
 
 import java.io.IOException;
 
@@ -30,6 +39,11 @@ public class SplinecartClient implements ClientModInitializer {
 	public static final ConfigOption.BooleanOption CFG_VBOS = CONFIG.optBool("vbos", false);
 	public static final ConfigOption.IntOption CFG_TRACK_RESOLUTION = CONFIG.optInt("track_resolution", 3, 1, 16);
 	public static final ConfigOption.IntOption CFG_TRACK_RENDER_DISTANCE = CONFIG.optInt("track_render_distance", 8, 4, 32);
+
+	public static final ShaderProgramKey ENTITY_CUTOUT_NO_CULL_UV_TRANSFORMED = registerShader(
+			Splinecart.id("core/rendertype_entity_cutout_no_cull_uv_transform"),
+			VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL,
+			Defines.EMPTY);
 
 	@Override
 	public void onInitializeClient() {
@@ -55,5 +69,30 @@ public class SplinecartClient implements ClientModInitializer {
 
 		HudRenderCallback.EVENT.register(new SplinecartHud());
 		TrackGeometry.CONSTRUCTOR = ClientTrackGeometry::new;
+	}
+
+	public static ShaderProgramKey registerShader(Identifier id, VertexFormat format, Defines defines) {
+		var key = new ShaderProgramKey(id, format, defines);
+		ShaderProgramKeys.getAll().add(key);
+		return key;
+	}
+
+	public static RenderLayer renderLayerEntityCutoutNoCullUvTransform(Identifier texture, float x, float y) {
+		return RenderLayer.of(
+				"splinecart_entity_cutout_no_cull_uv_transform",
+				VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL,
+				VertexFormat.DrawMode.QUADS,
+				1536,
+				true, false,
+				RenderLayer.MultiPhaseParameters.builder()
+						.program(new RenderPhase.ShaderProgram(ENTITY_CUTOUT_NO_CULL_UV_TRANSFORMED))
+						.texture(new RenderPhase.Texture(texture, TriState.FALSE, false))
+						.texturing(new RenderPhase.OffsetTexturing(x, y))
+						.transparency(RenderLayer.NO_TRANSPARENCY)
+						.cull(RenderLayer.DISABLE_CULLING)
+						.lightmap(RenderLayer.ENABLE_LIGHTMAP)
+						.overlay(RenderLayer.ENABLE_OVERLAY_COLOR)
+						.build(false)
+		);
 	}
 }
