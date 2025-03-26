@@ -26,7 +26,6 @@ import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
 import net.minecraft.client.render.entity.EmptyEntityRenderer;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TriState;
-import net.minecraft.util.Util;
 
 import java.io.IOException;
 

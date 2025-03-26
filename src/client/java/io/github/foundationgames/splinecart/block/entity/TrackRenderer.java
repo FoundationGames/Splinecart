@@ -16,7 +16,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.floatprovider.FloatSupplier;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3d;
@@ -25,7 +24,6 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public enum TrackRenderer {;
     public static int renderTrack(MatrixStack.Entry trackTransform, MatrixStack.Entry overlayTransform,
