@@ -1,4 +1,6 @@
 {
+  "itemGroup.splinecart": "Splinecart",
+
   "block.splinecart.track_ties": "Track Ties",
   "item.splinecart.track": "Track",
   "item.splinecart.chain_drive_track": "Chain Drive Track",

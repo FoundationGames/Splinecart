@@ -43,24 +43,44 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
             matrices.pop();
         }
 
-        int segs = SplinecartClient.CFG_TRACK_RESOLUTION.get() * Math.max((int) entity.estimatedTrackLength(), 2);
+        int trackResolution = SplinecartClient.CFG_TRACK_RESOLUTION.get();
+        int segs = trackResolution * Math.max((int) entity.estimatedTrackLength(), 2);
         var nextE = entity.next();
         var prevE = entity.prev();
-        var overlayBuf = TrackRenderer.immediateBuf(vertexConsumers, getTrackOverlayTexture(), RenderLayer::getEntityCutoutNoCull);
 
         matrices.push();
 
         var pos = entity.getPos();
         matrices.translate(-pos.getX(), -pos.getY(), -pos.getZ());
 
+        var overlayColor = new Vector3f(WHITEF);
+        float[] overlayVOffset = {0};
+
+        int power = entity.power();
+
+        if (nextE != null) {
+            var trackType = entity.nextType();
+
+            if (trackType.overlay != null) {
+                power = Math.max(entity.power(), nextE.power());
+                trackType.overlay.calculateEffects(power, entity.clientTime, overlayColor, overlayVOffset);
+            }
+        }
+
+
         if (!(entity.geometry instanceof ClientTrackGeometry geo &&
-                geo.render(matrices, overlayBuf, () -> RenderLayer.getEntityCutoutNoCullZOffset(getTexture()),
-                        light, overlay, segs, entity, prevE, nextE)
+                geo.render(matrices, light, overlay, segs,
+                        overlayVOffset[0], overlayColor,
+                        power, trackResolution,
+                        getTexture(), getTrackOverlayTexture(),
+                        entity, prevE, nextE)
         )) {
             TrackRenderer.renderTrack(matrices.peek(), matrices.peek(),
                     TrackRenderer.immediateBuf(vertexConsumers, getTexture(), RenderLayer::getEntityCutoutNoCullZOffset),
-                    overlayBuf,
-                    overlay, light, segs, entity, prevE, nextE);
+                    TrackRenderer.immediateBuf(vertexConsumers, getTrackOverlayTexture(), RenderLayer::getEntityCutoutNoCull),
+                    overlay, light, segs,
+                    overlayVOffset[0], overlayColor,
+                    entity, prevE, nextE);
         }
 
         matrices.pop();

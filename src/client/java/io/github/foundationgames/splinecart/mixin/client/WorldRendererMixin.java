@@ -4,9 +4,13 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import io.github.foundationgames.splinecart.SplinecartClient;
 import io.github.foundationgames.splinecart.block.entity.TrackTiesBlockEntityRenderer;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.BlockView;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -39,14 +43,13 @@ public class WorldRendererMixin {
         return old;
     }
 
-    @Inject(method = "scheduleChunkRender(IIIZ)V", at = @At("TAIL"))
-    private void splinecart$updateBlockEntityVbos(int x, int y, int z, boolean important, CallbackInfo ci) {
+    @Inject(method = "updateBlock(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;Lnet/minecraft/block/BlockState;I)V", at = @At("TAIL"))
+    private void splinecart$updateBlockEntityVbos(BlockView world, BlockPos pos, BlockState oldState, BlockState newState, int flags, CallbackInfo ci) {
         if (SplinecartClient.CFG_VBOS.get()) {
-            this.client.execute(() -> {
-                try {
-                    TrackTiesBlockEntityRenderer.queueVboRebuildsForChunkUpdate(x, y, z, noCullingBlockEntities);
-                } catch (ConcurrentModificationException ignored) {}
-            });
+            var chunkPos = ChunkSectionPos.from(pos);
+            try {
+                TrackTiesBlockEntityRenderer.queueVboRebuildsForChunkUpdate(chunkPos.getX(), chunkPos.getY(), chunkPos.getZ(), noCullingBlockEntities);
+            } catch (ConcurrentModificationException ignored) {}
         }
     }
 }

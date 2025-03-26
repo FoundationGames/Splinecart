@@ -21,15 +21,16 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3d;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
+import org.joml.Vector3fc;
 
 import java.util.function.Function;
 
 public enum TrackRenderer {;
-    public static boolean renderTrack(MatrixStack.Entry trackTransform, MatrixStack.Entry overlayTransform,
+    public static int renderTrack(MatrixStack.Entry trackTransform, MatrixStack.Entry overlayTransform,
                                       @Nullable BufferProvider trackBuffer, @Nullable BufferProvider overlayBuffer,
-                                      int overlay, int light, int segs,
+                                      int overlay, int light, int segs, float overlayVOffset, Vector3fc overlayColor,
                                       TrackTiesBlockEntity curr, TrackTiesBlockEntity prevE, TrackTiesBlockEntity nextE) {
-        boolean hasGeo = false;
+        int status = 0;
         var start = curr.pose();
 
         @Nullable var buffer = trackBuffer != null ? trackBuffer.buffer() : null;
@@ -57,25 +58,28 @@ public enum TrackRenderer {;
                     renderPart(world, trackTransform, buffer, start, end, u0, u1, 0, TrackTiesBlockEntityRenderer.WHITEF, t0, t1, totalDist, origin, basis, deriv, overlay);
                 }
 
-                hasGeo = trackBuffer.end();
+                status |= trackBuffer.end() ? 0b01 : 0b00;
             }
 
             if (overlayBuffer != null) {
-                renderTrackOverlay(overlayTransform, overlayBuffer,
+                status |= renderTrackOverlay(overlayTransform, overlayBuffer,
                         overlay, segs, start, end, world,
                         origin, basis, deriv,
-                        trackType, curr, nextE);
+                        overlayVOffset, overlayColor,
+                        trackType, curr, nextE)
+                ? 0b10 : 0b00;
             }
         } else if (trackBuffer != null) {
-            hasGeo = trackBuffer.end();
+            status |= trackBuffer.end() ? 0b01 : 0b00;
         }
 
-        return hasGeo;
+        return status;
     }
 
-    public static void renderTrackOverlay(MatrixStack.Entry transform, BufferProvider overlayBuffer,
+    public static boolean renderTrackOverlay(MatrixStack.Entry transform, BufferProvider overlayBuffer,
                                           int overlay, int segs, Pose start, Pose end, World world,
                                           Vector3d origin, Matrix3d basis, Vector3d deriv,
+                                          float vOffset, Vector3fc color,
                                           TrackType trackType, TrackTiesBlockEntity curr, TrackTiesBlockEntity next) {
         if (trackType.overlay != null) {
             var olBuffer = overlayBuffer.buffer();
@@ -84,20 +88,17 @@ public enum TrackRenderer {;
             float u1 = u0 + 0.25f;
             double[] totalDist = {0};
 
-            float[] olVOffset = {0};
-            Vector3f olColor = new Vector3f(TrackTiesBlockEntityRenderer.WHITEF);
-            int power = Math.max(curr.power(), next.power());
-            trackType.overlay.calculateEffects(power, curr.clientTime, olColor, olVOffset);
-
             for (int i = 0; i < segs; i++) {
                 double t0 = (double)i / segs;
                 double t1 = (double)(i + 1) / segs;
 
-                renderPart(world, transform, olBuffer, start, end, u0, u1, olVOffset[0], olColor, t0, t1, totalDist, origin, basis, deriv, overlay);
+                renderPart(world, transform, olBuffer, start, end, u0, u1, vOffset, color, t0, t1, totalDist, origin, basis, deriv, overlay);
             }
 
-            overlayBuffer.end();
+            return overlayBuffer.end();
         }
+
+        return false;
     }
 
     private static void renderExtraTrackEnd(MatrixStack.Entry transform, VertexConsumer buffer, Pose pose,
@@ -145,7 +146,7 @@ public enum TrackRenderer {;
     }
 
     private static void renderPart(World world, MatrixStack.Entry entry, VertexConsumer buffer, Pose start, Pose end,
-                                   float u0, float u1, float vOffset, Vector3f color, double t0, double t1, double[] blockProgress,
+                                   float u0, float u1, float vOffset, Vector3fc color, double t0, double t1, double[] blockProgress,
                                    Vector3d origin0, Matrix3d basis0, Vector3d deriv0, int overlay) {
         start.interpolate(end, t0, origin0, basis0, deriv0);
         var norm0 = new Vector3d(0, 1, 0).mul(basis0);
