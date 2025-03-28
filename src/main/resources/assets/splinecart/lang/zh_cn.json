@@ -1,0 +1,23 @@
+{
+  "block.splinecart.track_ties": "轨道枕木",
+  "item.splinecart.track": "轨道",
+  "item.splinecart.chain_drive_track": "链条驱动轨道",
+  "item.splinecart.magnetic_track": "磁力轨道",
+
+  "item.splinecart.track_ties.desc": "放置后交互可旋转",
+  "item.splinecart.track.desc": "将两个轨道枕木连接在一起",
+  "item.splinecart.chain_drive_track.desc": "一种可拉动矿车的轨道类型",
+  "item.splinecart.magnetic_track.desc": "一种可加速或减速矿车的轨道类型",
+
+  "item.splinecart.track.origin": "已选择第一个轨道",
+  "item.splinecart.track.clear_hint": "在非轨道方块上使用以取消上次的选择",
+
+  "entity.splinecart.track_follower": "轨道追踪器",
+
+  "splinecart.config.query_value": "选项 '%s' 当前值为 '%s'。",
+  "splinecart.config.set_value": "选项 '%s' 已设置为 '%s'。",
+  
+  "splinecart.config.splinecart_client.rotate_camera.desc": "建议为容易晕3d的玩家将此项设置为'false'。设置为'false'时，当乘坐非水平的模组轨道时，玩家的摄像机方向会保持水平。非水平轨道在将'rotate_camera'设置为'false'时，最佳体验是在第三人称视角下。",
+  "splinecart.config.splinecart_client.track_resolution.desc": "较高的值会降低性能并提高视觉质量。决定渲染时轨道被分割成多少段，较少的段落会使轨道看起来更为锯齿。此项不会影响矿车在轨道上的运动。（抗锯齿）",
+  "splinecart.config.splinecart_client.track_render_distance.desc": "当原始轨道枕木距离你一定的区块数时，其轨道将不被渲染。"
+}
