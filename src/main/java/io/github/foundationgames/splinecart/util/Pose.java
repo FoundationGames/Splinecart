@@ -1,5 +1,7 @@
 package io.github.foundationgames.splinecart.util;
 
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.PacketCodec;
 import org.joml.Matrix3d;
 import org.joml.Matrix3dc;
 import org.joml.Quaterniond;
@@ -7,38 +9,63 @@ import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
 public record Pose(Vector3dc translation, Matrix3dc basis) {
-    public void interpolate(Pose other, double t, Vector3d translation, Matrix3d basis, Vector3d gradient) {
-        double factor = this.translation().distance(other.translation());
-        interpolate(other, t, factor, translation, basis, gradient);
+    public static final PacketCodec<ByteBuf, Pose> PACKET_CODEC = PacketCodec.of(
+            (pose, buf) -> {
+                for (int i = 0; i < 3; i++) {
+                    buf.writeDouble(pose.translation().get(i));
+                }
+                for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) {
+                    buf.writeDouble(pose.basis().get(j, i));
+                }
+            },
+            (buf) -> {
+                var translation = new Vector3d();
+                var basis = new Matrix3d();
+
+                for (int i = 0; i < 3; i++) {
+                    translation.setComponent(i, buf.readDouble());
+                }
+                for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) {
+                    basis.setRowColumn(i, j, buf.readDouble());
+                }
+                return new Pose(translation, basis);
+            }
+    );
+
+    public double factor(Pose other) {
+        return this.translation().distance(other.translation());
     }
 
-    public void interpolate(Pose other, double t, double factor, Vector3d translation, Matrix3d basis, Vector3d gradient) {
-        var point0 = translation.set(this.translation());
-        var point1 = new Vector3d(other.translation());
+    public void interpolate(Pose other, double t, Vector3d translationInOut, Matrix3d basisInOut, Vector3d derivOut) {
+        interpolate(other, t, factor(other), translationInOut, basisInOut, derivOut);
+    }
 
-        var grad0 = new Vector3d(0, 0, 1).mul(this.basis());
-        var grad1 = new Vector3d(0, 0, 1).mul(other.basis());
-
-        cubicHermiteSpline(t, factor, point0, grad0, point1, grad1, translation, gradient);
-        var ngrad = gradient.normalize(new Vector3d());
+    public void interpolate(Pose other, double t, double factor, Vector3d translationInOut, Matrix3d basisInOut, Vector3d derivOut) {
+        interpolateTranslation(other, t, factor, translationInOut, derivOut);
+        var newForward = derivOut.normalize(new Vector3d());
 
         var rot0 = this.basis().getNormalizedRotation(new Quaterniond());
         var rot1 = other.basis().getNormalizedRotation(new Quaterniond());
 
         var rotT = rot0.nlerp(rot1, t, new Quaterniond());
-        basis.set(rotT);
+        basisInOut.set(rotT);
 
-        var basisGrad = new Vector3d(0, 0, 1).mul(basis);
-        var axis = ngrad.cross(basisGrad, new Vector3d());
+        var currForward = basisInOut.getColumn(2, new Vector3d());
+        new Matrix3d().identity().rotate(currForward.rotationTo(newForward, new Quaterniond())).mul(basisInOut, basisInOut);
+    }
 
-        if (axis.length() > 0) {
-            axis.normalize();
-            double angleToNewBasis = basisGrad.angleSigned(ngrad, axis);
-            if (angleToNewBasis != 0) {
-                new Matrix3d().identity().rotate(angleToNewBasis, axis)
-                        .mul(basis, basis).normal();
-            }
-        }
+    public void interpolateTranslation(Pose other, double t, Vector3d translationInOut, Vector3d derivOut) {
+        interpolateTranslation(other, t, factor(other), translationInOut, derivOut);
+    }
+
+    public void interpolateTranslation(Pose other, double t, double factor, Vector3d translationInOut, Vector3d derivOut) {
+        var point0 = translationInOut.set(this.translation());
+        var point1 = new Vector3d(other.translation());
+
+        var deriv0 = this.basis().getColumn(2, new Vector3d());
+        var deriv1 = other.basis().getColumn(2, new Vector3d());
+
+        cubicHermiteSpline(t, factor, point0, deriv0, point1, deriv1, translationInOut, derivOut);
     }
 
     public static Vector3d cubicHermiteSpline(double t, double factor, Vector3dc p0, Vector3dc m0, Vector3dc p1, Vector3dc m1,

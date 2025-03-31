@@ -7,10 +7,14 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
+import org.joml.Vector3dc;
 import org.joml.Vector3f;
 
 import java.util.function.BiFunction;
+import java.util.function.DoubleSupplier;
 
 public enum SUtil {;
     public static final Vector3f[] REDSTONE_COLOR_LUT = Util.make(new Vector3f[16], colors -> {
@@ -23,6 +27,9 @@ public enum SUtil {;
             );
         }
     });
+
+    public static final Quaternionf BACKWARDS = RotationAxis.POSITIVE_Y.rotation(MathHelper.PI);
+    public static DoubleSupplier TICK_DELTA = () -> 0;
 
     public static void putBlockPos(NbtCompound nbt, @Nullable BlockPos pos, String key) {
         if (pos == null) {
@@ -40,5 +47,13 @@ public enum SUtil {;
     public static <V, T extends V> T register(Registry<V> registry, Identifier id, BiFunction<Identifier, RegistryKey<V>, T> obj) {
         RegistryKey<V> key = RegistryKey.of(registry.getKey(), id);
         return Registry.register(registry, id, obj.apply(id, key));
+    }
+
+    public static boolean failsSanityCheck(Vector3dc vec) {
+        return Double.isNaN(vec.x()) || Double.isNaN(vec.y()) || Double.isNaN(vec.z());
+    }
+
+    public static boolean failsSanityCheck(Quaternionf rot) {
+        return Double.isNaN(rot.x()) || Double.isNaN(rot.y()) || Double.isNaN(rot.z()) || Double.isNaN(rot.w());
     }
 }

@@ -6,7 +6,9 @@ import io.github.foundationgames.splinecart.component.OriginComponent;
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
 import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.SUtil;
+import io.github.foundationgames.splinecart.util.TrackProgress;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.minecraft.block.AbstractBlock;
@@ -17,8 +19,10 @@ import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LoreComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemGroups;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -61,6 +65,17 @@ public class Splinecart implements ModInitializer {
 
 	public static final TagKey<EntityType<?>> CARTS = TagKey.of(RegistryKeys.ENTITY_TYPE, id("carts"));
 
+	public static final ItemGroup SPLINECART_GROUP = FabricItemGroup.builder()
+			.displayName(Text.translatable("itemGroup.splinecart"))
+			.entries((ctx, e) -> {
+				e.add(TRACK_TIES.asItem().getDefaultStack());
+				e.add(TRACK.getDefaultStack());
+				e.add(CHAIN_DRIVE_TRACK.getDefaultStack());
+				e.add(MAGNETIC_TRACK.getDefaultStack());
+			})
+			.icon(CHAIN_DRIVE_TRACK::getDefaultStack)
+			.build();
+
 	@Override
 	public void onInitialize() {
 		var tieItem = SUtil.register(Registries.ITEM, id("track_ties"),
@@ -75,6 +90,10 @@ public class Splinecart implements ModInitializer {
 			entries.add(CHAIN_DRIVE_TRACK.getDefaultStack());
 			entries.add(MAGNETIC_TRACK.getDefaultStack());
 		});
+
+		TrackedDataHandlerRegistry.register(TrackProgress.DATA_HANDLER);
+
+		Registry.register(Registries.ITEM_GROUP, id("splinecart"), SPLINECART_GROUP);
 	}
 
 	public static LoreComponent lore(Text lore) {
