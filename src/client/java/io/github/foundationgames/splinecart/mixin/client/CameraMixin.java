@@ -53,25 +53,27 @@ public abstract class CameraMixin {
             at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;", remap = false))
     private void splinecart$updateCamRotationWhileRiding(float yaw, float pitch, CallbackInfo info) {
         var self = this.focusedEntity;
-        var vehicle = self.getVehicle();
-        var tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
-        if (vehicle != null) {
-            var tf = vehicle.getVehicle();
-            if (tf instanceof TrackFollowerEntity trackFollower) {
-                var world = self.getWorld();
-                if (world.isClient()) {
-                    var rot = new Quaternionf();
-                    trackFollower.getClientOrientation(rot, tickDelta);
+		if (self != null) {
+			var vehicle = self.getVehicle();
+			var tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
+			if (vehicle != null) {
+				var tf = vehicle.getVehicle();
+				if (tf instanceof TrackFollowerEntity trackFollower) {
+					var world = self.getWorld();
+					if (world.isClient()) {
+						var rot = new Quaternionf();
+						trackFollower.getClientOrientation(rot, tickDelta);
 
-                    if (SUtil.failsSanityCheck(rot)) {
-                        return;
-                    }
+						if (SUtil.failsSanityCheck(rot)) {
+							return;
+						}
 
-                    if (SplinecartClient.CFG_ROTATE_CAMERA.get()) {
-                        rot.mul(RotationAxis.POSITIVE_Y.rotationDegrees(90 + vehicle.getYaw(tickDelta)).mul(rotation, rotation), rotation);
-                    }
-                }
-            }
-        }
+						if (SplinecartClient.CFG_ROTATE_CAMERA.get()) {
+							rot.mul(RotationAxis.POSITIVE_Y.rotationDegrees(90 + vehicle.getYaw(tickDelta)).mul(rotation, rotation), rotation);
+						}
+					}
+				}
+			}
+		}
     }
 }
