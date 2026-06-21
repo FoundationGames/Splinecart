@@ -8,24 +8,14 @@ import io.github.foundationgames.splinecart.config.Config;
 import io.github.foundationgames.splinecart.config.ConfigOption;
 import io.github.foundationgames.splinecart.util.SUtil;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Defines;
-import net.minecraft.client.gl.ShaderProgramKey;
-import net.minecraft.client.gl.ShaderProgramKeys;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderPhase;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
-import net.minecraft.client.render.entity.EmptyEntityRenderer;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.TriState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.NoopRenderer;
 
 import java.io.IOException;
 
@@ -39,14 +29,9 @@ public class SplinecartClient implements ClientModInitializer {
 	public static final ConfigOption.IntOption CFG_TRACK_RESOLUTION = CONFIG.optInt("track_resolution", 3, 1, 16);
 	public static final ConfigOption.IntOption CFG_TRACK_RENDER_DISTANCE = CONFIG.optInt("track_render_distance", 8, 4, 32);
 
-	public static final ShaderProgramKey ENTITY_CUTOUT_NO_CULL_UV_TRANSFORMED = registerShader(
-			Splinecart.id("core/rendertype_entity_cutout_no_cull_uv_transform"),
-			VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL,
-			Defines.EMPTY);
-
 	@Override
 	public void onInitializeClient() {
-		SUtil.TICK_DELTA = () -> MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
+		SUtil.TICK_DELTA = () -> Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
 
 		try {
 			CONFIG.load();
@@ -54,44 +39,17 @@ public class SplinecartClient implements ClientModInitializer {
 			Splinecart.LOGGER.error("Error loading client config on mod init", e);
 		}
 
-		BlockRenderLayerMap.INSTANCE.putBlock(Splinecart.TRACK_TIES, RenderLayer.getCutout());
-
-		BlockEntityRendererFactories.register(Splinecart.TRACK_TIES_BE, TrackTiesBlockEntityRenderer::new);
-		EntityRendererRegistry.register(Splinecart.TRACK_FOLLOWER, EmptyEntityRenderer::new);
+		BlockEntityRendererRegistry.register(Splinecart.TRACK_TIES_BE, TrackTiesBlockEntityRenderer::new);
+		EntityRendererRegistry.register(Splinecart.TRACK_FOLLOWER, NoopRenderer::new);
 
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
 				dispatcher.register(
 					LiteralArgumentBuilder.<FabricClientCommandSource>literal("splinecartc")
-							.then(CONFIG.command(LiteralArgumentBuilder.literal("config"),
+							.then(CONFIG.command(LiteralArgumentBuilder.<FabricClientCommandSource>literal("config"),
 									FabricClientCommandSource::sendFeedback))
 		));
 
-		HudRenderCallback.EVENT.register(new SplinecartHud());
+		HudElementRegistry.addLast(Splinecart.id("hud"), new SplinecartHud());
 		TrackGeometry.CONSTRUCTOR = ClientTrackGeometry::new;
-	}
-
-	public static ShaderProgramKey registerShader(Identifier id, VertexFormat format, Defines defines) {
-		var key = new ShaderProgramKey(id, format, defines);
-		ShaderProgramKeys.getAll().add(key);
-		return key;
-	}
-
-	public static RenderLayer renderLayerEntityCutoutNoCullUvTransform(Identifier texture, float x, float y) {
-		return RenderLayer.of(
-				"splinecart_entity_cutout_no_cull_uv_transform",
-				VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL,
-				VertexFormat.DrawMode.QUADS,
-				1536,
-				true, false,
-				RenderLayer.MultiPhaseParameters.builder()
-						.program(new RenderPhase.ShaderProgram(ENTITY_CUTOUT_NO_CULL_UV_TRANSFORMED))
-						.texture(new RenderPhase.Texture(texture, TriState.FALSE, false))
-						.texturing(new RenderPhase.OffsetTexturing(x, y))
-						.transparency(RenderLayer.NO_TRANSPARENCY)
-						.cull(RenderLayer.DISABLE_CULLING)
-						.lightmap(RenderLayer.ENABLE_LIGHTMAP)
-						.overlay(RenderLayer.ENABLE_OVERLAY_COLOR)
-						.build(false)
-		);
 	}
 }

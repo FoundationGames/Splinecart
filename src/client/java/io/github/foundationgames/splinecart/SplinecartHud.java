@@ -1,32 +1,32 @@
 package io.github.foundationgames.splinecart;
 
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.hit.BlockHitResult;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.world.phys.BlockHitResult;
 
-public class SplinecartHud implements HudRenderCallback {
-    public static final Text CANCEL = Text.translatable("hud.splinecart.cancel").formatted(Formatting.RED);
-    public static final Text CREATE = Text.translatable("hud.splinecart.create_track").formatted(Formatting.GREEN);
+public class SplinecartHud implements HudElement {
+    public static final Component CANCEL = Component.translatable("hud.splinecart.cancel").withStyle(ChatFormatting.RED);
+    public static final Component CREATE = Component.translatable("hud.splinecart.create_track").withStyle(ChatFormatting.GREEN);
     public static final String RIGHT_CLICK_HINT = "hud.splinecart.right_click";
 
     @Override
-    public void onHudRender(DrawContext drawContext, RenderTickCounter tickCounter) {
-        var client = MinecraftClient.getInstance();
-        var world = client.world;
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, DeltaTracker tickCounter) {
+        var client = Minecraft.getInstance();
+        var world = client.level;
 
         if (world != null && client.player != null) {
-            var origin = client.player.getMainHandStack().get(Splinecart.ORIGIN_POS);
+            var origin = client.player.getMainHandItem().get(Splinecart.ORIGIN_POS);
 
             if (origin == null) {
-                origin = client.player.getOffHandStack().get(Splinecart.ORIGIN_POS);
+                origin = client.player.getOffhandItem().get(Splinecart.ORIGIN_POS);
             }
 
-            if (origin != null && client.crosshairTarget instanceof BlockHitResult hit) {
+            if (origin != null && client.hitResult instanceof BlockHitResult hit) {
                 var pos = hit.getBlockPos();
                 if (world.getBlockState(pos).isAir()) {
                     return;
@@ -38,11 +38,11 @@ public class SplinecartHud implements HudRenderCallback {
                     hint = CREATE;
                 }
 
-                int w = drawContext.getScaledWindowWidth();
-                int h = drawContext.getScaledWindowHeight();
+                int w = guiGraphics.guiWidth();
+                int h = guiGraphics.guiHeight();
 
-                var text = Text.translatable(RIGHT_CLICK_HINT, client.options.useKey.getBoundKeyLocalizedText(), hint);
-                drawContext.drawCenteredTextWithShadow(client.textRenderer, text, w / 2, (h / 2) + 20, 0xFFFFFFFF);
+                var text = Component.translatable(RIGHT_CLICK_HINT, client.options.keyUse.getTranslatedKeyMessage(), hint);
+                guiGraphics.centeredText(client.font, text, w / 2, (h / 2) + 20, 0xFFFFFFFF);
             }
         }
     }

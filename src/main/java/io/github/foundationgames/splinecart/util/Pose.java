@@ -1,7 +1,7 @@
 package io.github.foundationgames.splinecart.util;
 
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.StreamCodec;
 import org.joml.Matrix3d;
 import org.joml.Matrix3dc;
 import org.joml.Quaterniond;
@@ -9,8 +9,8 @@ import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
 public record Pose(Vector3dc translation, Matrix3dc basis) {
-    public static final PacketCodec<ByteBuf, Pose> PACKET_CODEC = PacketCodec.of(
-            (pose, buf) -> {
+    public static final StreamCodec<ByteBuf, Pose> PACKET_CODEC = StreamCodec.of(
+            (buf, pose) -> {
                 for (int i = 0; i < 3; i++) {
                     buf.writeDouble(pose.translation().get(i));
                 }

@@ -3,65 +3,65 @@ package io.github.foundationgames.splinecart.block;
 import com.mojang.serialization.MapCodec;
 import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.Pose;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockEntityProvider;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.FacingBlock;
-import net.minecraft.block.ShapeContext;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.IntProperty;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.world.BlockView;
-import net.minecraft.world.World;
-import net.minecraft.world.block.WireOrientation;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.DirectionalBlock;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.redstone.Orientation;
 import org.jetbrains.annotations.Nullable;
 import org.joml.AxisAngle4d;
 import org.joml.Matrix3d;
 import org.joml.Vector3d;
 
-public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
-    public static final MapCodec<TrackTiesBlock> CODEC = createCodec(TrackTiesBlock::new);
-    public static final IntProperty POINTING = IntProperty.of("pointing", 0, 3);
+public class TrackTiesBlock extends DirectionalBlock implements EntityBlock {
+    public static final MapCodec<TrackTiesBlock> CODEC = simpleCodec(TrackTiesBlock::new);
+    public static final IntegerProperty POINTING = IntegerProperty.create("pointing", 0, 3);
 
     public static final VoxelShape[] SHAPES = new VoxelShape[Direction.values().length];
 
-    public TrackTiesBlock(Settings settings) {
+    public TrackTiesBlock(Properties settings) {
         super(settings);
-        setDefaultState(getDefaultState().with(FACING, Direction.UP).with(POINTING, 0));
+        registerDefaultState(defaultBlockState().setValue(FACING, Direction.UP).setValue(POINTING, 0));
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        super.appendProperties(builder);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        super.createBlockStateDefinition(builder);
         builder.add(FACING, POINTING);
     }
 
     @Nullable
     @Override
-    public BlockState getPlacementState(ItemPlacementContext ctx) {
-        var side = ctx.getSide();
-        var hdir = ctx.getHorizontalPlayerFacing();
+    public BlockState getStateForPlacement(BlockPlaceContext ctx) {
+        var side = ctx.getClickedFace();
+        var hdir = ctx.getHorizontalDirection();
         int rot;
 
         switch (side) {
-            case DOWN -> rot = Math.floorMod(2 + hdir.getHorizontal(), 4);
-            case UP -> rot = Math.floorMod(2 - hdir.getHorizontal(), 4);
+            case DOWN -> rot = Math.floorMod(2 + hdir.get2DDataValue(), 4);
+            case UP -> rot = Math.floorMod(2 - hdir.get2DDataValue(), 4);
             default -> {
-                int hos = Math.floorMod(2 + hdir.getOpposite().getHorizontal() - side.getHorizontal(), 4) - 2;
+                int hos = Math.floorMod(2 + hdir.getOpposite().get2DDataValue() - side.get2DDataValue(), 4) - 2;
                 if (hos == 0) {
                     var player = ctx.getPlayer();
                     float pitch = 0;
                     if (player != null) {
-                        pitch = player.getPitch();
+                        pitch = player.getXRot();
                     }
                     rot = pitch <= 0 ? 2 : 0;
                 } else {
@@ -70,30 +70,19 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
             }
         }
 
-        return getDefaultState().with(FACING, ctx.getSide()).with(POINTING, rot);
+        return defaultBlockState().setValue(FACING, ctx.getClickedFace()).setValue(POINTING, rot);
     }
 
     @Override
-    protected VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return SHAPES[state.get(FACING).ordinal()];
+    protected VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+        return SHAPES[state.getValue(FACING).ordinal()];
     }
 
-    @Override
-    protected void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
-        if (world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
-            if (!newState.isOf(state.getBlock())) {
-                if (!world.isClient()) tie.onDestroy();
-            } else {
-                tie.updatePose(pos, newState);
-            }
-        }
 
-        super.onStateReplaced(state, world, pos, newState, moved);
-    }
 
     @Override
-    protected void neighborUpdate(BlockState state, World world, BlockPos pos, Block sourceBlock, @Nullable WireOrientation wireOrientation, boolean notify) {
-        super.neighborUpdate(state, world, pos, sourceBlock, wireOrientation, notify);
+    protected void neighborChanged(BlockState state, Level world, BlockPos pos, Block sourceBlock, @Nullable Orientation neighborPos, boolean moved) {
+        super.neighborChanged(state, world, pos, sourceBlock, neighborPos, moved);
 
         if (world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
             tie.updatePower();
@@ -101,32 +90,32 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
     }
 
     @Override
-    protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        if (player.canModifyBlocks() &&
-                !(player.getStackInHand(Hand.MAIN_HAND).getItem() instanceof TrackItem) &&
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
+        if (player.mayBuild() &&
+                !(player.getItemInHand(InteractionHand.MAIN_HAND).getItem() instanceof TrackItem) &&
                 world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie) {
             if (tie.prev() == null && tie.next() == null) {
-                if (world.isClient()) {
-                    return ActionResult.SUCCESS;
+                if (world.isClientSide()) {
+                    return InteractionResult.SUCCESS;
                 } else {
-                    var newState = state.with(POINTING, (state.get(POINTING) + 1) % 4);
-                    world.setBlockState(pos, newState);
+                    var newState = state.setValue(POINTING, (state.getValue(POINTING) + 1) % 4);
+                    world.setBlock(pos, newState, 3);
                     tie.updatePose(pos, newState);
-                    tie.markDirty();
+                    tie.setChanged();
                     tie.sync();
 
-                    return ActionResult.CONSUME;
+                    return InteractionResult.CONSUME;
                 }
             }
         }
 
-        return super.onUse(state, world, pos, player, hit);
+        return super.useWithoutItem(state, world, pos, player, hit);
     }
 
     public Pose getPose(BlockState state, BlockPos pos) {
-        if (state.contains(FACING) && state.contains(POINTING)) {
-            var face = state.get(FACING);
-            int point = state.get(POINTING);
+        if (state.hasProperty(FACING) && state.hasProperty(POINTING)) {
+            var face = state.getValue(FACING);
+            int point = state.getValue(POINTING);
 
             return getPose(pos, face, point);
         }
@@ -138,28 +127,27 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
         var pos = new Vector3d();
         var basis = new Matrix3d().identity();
 
-        var normVec = normal.getVector();
-        pos.set(normVec.getX(), normVec.getY(), normVec.getZ()).mul(-0.4375).add(block.getX() + 0.5, block.getY() + 0.5, block.getZ() + 0.5);
+        pos.set(normal.getStepX(), normal.getStepY(), normal.getStepZ()).mul(-0.4375).add(block.getX() + 0.5, block.getY() + 0.5, block.getZ() + 0.5);
 
         if (normal == Direction.UP || normal == Direction.DOWN) {
             point += 2;
         }
 
-        var axisAngle = new AxisAngle4d(point * MathHelper.PI * 0.5, normVec.getX(), normVec.getY(), normVec.getZ());
+        var axisAngle = new AxisAngle4d(point * Mth.PI * 0.5, normal.getStepX(), normal.getStepY(), normal.getStepZ());
         basis.rotate(axisAngle);
-        basis.rotate(normal.getRotationQuaternion());
+        basis.rotate(normal.getRotation());
 
         return new Pose(pos, basis);
     }
 
     @Override
-    protected MapCodec<? extends FacingBlock> getCodec() {
+    protected MapCodec<? extends DirectionalBlock> codec() {
         return CODEC;
     }
 
     @Nullable
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new TrackTiesBlockEntity(pos, state);
     }
 
@@ -169,14 +157,14 @@ public class TrackTiesBlock extends FacingBlock implements BlockEntityProvider {
             var min = new Vector3d(-8, -8, -8);
             var max = new Vector3d(8, -6, 8);
 
-            var rot = dir.getRotationQuaternion();
+            var rot = dir.getRotation();
             rot.transform(min);
             rot.transform(max);
 
             min.add(8, 8, 8);
             max.add(8, 8, 8);
 
-            SHAPES[idx] = createCuboidShape(
+            SHAPES[idx] = Block.box(
                     Math.min(min.x(), max.x()),
                     Math.min(min.y(), max.y()),
                     Math.min(min.z(), max.z()),

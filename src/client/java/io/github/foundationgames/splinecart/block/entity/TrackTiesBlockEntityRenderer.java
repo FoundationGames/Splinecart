@@ -2,88 +2,111 @@ package io.github.foundationgames.splinecart.block.entity;
 
 import io.github.foundationgames.splinecart.Splinecart;
 import io.github.foundationgames.splinecart.SplinecartClient;
+import io.github.foundationgames.splinecart.TrackType;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.github.foundationgames.splinecart.util.Pose;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.resources.Identifier;
 import org.joml.Vector3f;
+import net.minecraft.util.LightCoordsUtil;
 
 import java.util.Set;
 
-public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTiesBlockEntity> {
+public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTiesBlockEntity, TrackTiesBlockEntityRenderer.TrackTiesRenderState> {
     public static final int WHITE = 0xFFFFFFFF;
     public static final Vector3f WHITEF = new Vector3f(1, 1, 1);
     public static final Identifier TRACK_TEXTURE = Splinecart.id("textures/track.png");
     public static final Identifier TRACK_OVERLAY_TEXTURE = Splinecart.id("textures/track_overlay.png");
     public static final Identifier POSE_TEXTURE_DEBUG = Splinecart.id("textures/debug.png");
 
-    public TrackTiesBlockEntityRenderer(BlockEntityRendererFactory.Context ctx) {
+    public TrackTiesBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {
     }
 
     @Override
-    public void render(TrackTiesBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
-        entity.clientTime += tickDelta;
+    public TrackTiesRenderState createRenderState() {
+        return new TrackTiesRenderState();
+    }
 
-        if (MinecraftClient.getInstance().getDebugHud().shouldShowDebugHud()) {
-            matrices.push();
+    @Override
+    public void extractRenderState(TrackTiesBlockEntity entity, TrackTiesRenderState state, float partialTick, net.minecraft.world.phys.Vec3 cameraPos, net.minecraft.client.renderer.feature.ModelFeatureRenderer.CrumblingOverlay crumbling) {
+        BlockEntityRenderState.extractBase(entity, state, crumbling);
+        state.trackTies = entity;
+        state.pose = entity.pose();
+        entity.clientTime += partialTick;
+        state.clientTime = entity.clientTime;
+        state.estimatedTrackLength = entity.estimatedTrackLength();
+        state.next = entity.next();
+        state.prev = entity.prev();
+        state.nextType = entity.nextType();
+        state.power = entity.power();
+    }
 
-            matrices.translate(0.5, 0.5, 0.5);
-            var buffer = vertexConsumers.getBuffer(RenderLayer.getEntityCutoutNoCull(POSE_TEXTURE_DEBUG));
-            renderDebug(entity.pose(), matrices.peek(), buffer);
-
-            matrices.pop();
+    @Override
+    public void submit(TrackTiesRenderState state, PoseStack poseStack, SubmitNodeCollector nodeCollector, CameraRenderState cameraState) {
+        if (Minecraft.getInstance().getDebugOverlay().showDebugScreen()) {
+            poseStack.pushPose();
+            poseStack.translate(0.5, 0.5, 0.5);
+            nodeCollector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(POSE_TEXTURE_DEBUG), (entry, buffer) -> {
+                renderDebug(state.pose, entry, buffer);
+            });
+            poseStack.popPose();
         }
 
         int trackResolution = SplinecartClient.CFG_TRACK_RESOLUTION.get();
-        int segs = trackResolution * Math.max((int) entity.estimatedTrackLength(), 2);
-        var nextE = entity.next();
-        var prevE = entity.prev();
+        int segs = trackResolution * Math.max((int) state.estimatedTrackLength, 2);
 
-        matrices.push();
-
-        var pos = entity.getPos();
-        matrices.translate(-pos.getX(), -pos.getY(), -pos.getZ());
+        poseStack.pushPose();
+        var pos = state.blockPos;
+        poseStack.translate(-pos.getX(), -pos.getY(), -pos.getZ());
 
         var overlayColor = new Vector3f(WHITEF);
         float[] overlayVOffset = {0};
 
-        int power = entity.power();
+        int power = state.power;
 
-        if (nextE != null) {
-            var trackType = entity.nextType();
+        if (state.next != null) {
+            var trackType = state.nextType;
 
             if (trackType.overlay != null) {
-                power = Math.max(entity.power(), nextE.power());
-                trackType.overlay.calculateEffects(power, entity.clientTime, overlayColor, overlayVOffset);
+                power = Math.max(state.power, state.next.power());
+                trackType.overlay.calculateEffects(power, state.clientTime, overlayColor, overlayVOffset);
             }
         }
 
+        // Render main track
+        nodeCollector.submitCustomGeometry(poseStack, RenderTypes.entityCutoutZOffset(getTexture()), (entry, buffer) -> {
+            var trackProvider = new TrackRenderer.DirectBufferProvider(buffer);
+            TrackRenderer.renderTrack(entry, entry,
+                    trackProvider, null,
+                    OverlayTexture.NO_OVERLAY, state.lightCoords, segs,
+                    0, overlayColor,
+                    state.trackTies, state.prev, state.next);
+        });
 
-        if (!(entity.geometry instanceof ClientTrackGeometry geo &&
-                geo.render(matrices, light, overlay, segs,
+        // Render overlay
+        if (state.next != null && state.nextType.overlay != null) {
+            nodeCollector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(getTrackOverlayTexture()), (entry, buffer) -> {
+                var overlayProvider = new TrackRenderer.DirectBufferProvider(buffer);
+                TrackRenderer.renderTrack(entry, entry,
+                        null, overlayProvider,
+                        OverlayTexture.NO_OVERLAY, state.lightCoords, segs,
                         overlayVOffset[0], overlayColor,
-                        power, trackResolution,
-                        getTexture(), getTrackOverlayTexture(),
-                        entity, prevE, nextE)
-        )) {
-            TrackRenderer.renderTrack(matrices.peek(), matrices.peek(),
-                    TrackRenderer.immediateBuf(vertexConsumers, getTexture(), RenderLayer::getEntityCutoutNoCullZOffset),
-                    TrackRenderer.immediateBuf(vertexConsumers, getTrackOverlayTexture(), RenderLayer::getEntityCutoutNoCull),
-                    overlay, light, segs,
-                    overlayVOffset[0], overlayColor,
-                    entity, prevE, nextE);
+                        state.trackTies, state.prev, state.next);
+            });
         }
 
-        matrices.pop();
+        poseStack.popPose();
     }
 
     protected Identifier getTexture() {
@@ -95,35 +118,35 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
     }
 
     @Override
-    public boolean rendersOutsideBoundingBox(TrackTiesBlockEntity blockEntity) {
+    public boolean shouldRenderOffScreen() {
         return true;
     }
 
     @Override
-    public int getRenderDistance() {
+    public int getViewDistance() {
         return SplinecartClient.CFG_TRACK_RENDER_DISTANCE.get() * 16;
     }
 
-    private static void renderDebug(Pose pose, MatrixStack.Entry entry, VertexConsumer buffer) {
-        var posMat = entry.getPositionMatrix();
+    private static void renderDebug(Pose pose, PoseStack.Pose entry, VertexConsumer buffer) {
+        var posMat = entry.pose();
         for (int x = 0; x < 3; x++) {
             for (int y = 0; y < 3; y++) {
                 posMat.setRowColumn(x, y, (float) pose.basis().getRowColumn(x, y));
             }
         }
 
-        buffer.vertex(entry, 1, 0, 1).color(WHITE).texture(0, 0)
-                .overlay(OverlayTexture.DEFAULT_UV).light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0, 1, 0);
-        buffer.vertex(entry, 0, 0, 1).color(WHITE).texture(1, 0)
-                .overlay(OverlayTexture.DEFAULT_UV).light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0, 1, 0);
-        buffer.vertex(entry, 0, 0, 0).color(WHITE).texture(1, 1)
-                .overlay(OverlayTexture.DEFAULT_UV).light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0, 1, 0);
-        buffer.vertex(entry, 1, 0, 0).color(WHITE).texture(0, 1)
-                .overlay(OverlayTexture.DEFAULT_UV).light(LightmapTextureManager.MAX_LIGHT_COORDINATE)
-                .normal(entry, 0, 1, 0);
+        buffer.addVertex(entry, 1, 0, 1).setColor(WHITE).setUv(0, 0)
+                .setOverlay(OverlayTexture.NO_OVERLAY).setLight(LightCoordsUtil.FULL_BRIGHT)
+                .setNormal(entry, 0, 1, 0);
+        buffer.addVertex(entry, 0, 0, 1).setColor(WHITE).setUv(1, 0)
+                .setOverlay(OverlayTexture.NO_OVERLAY).setLight(LightCoordsUtil.FULL_BRIGHT)
+                .setNormal(entry, 0, 1, 0);
+        buffer.addVertex(entry, 0, 0, 0).setColor(WHITE).setUv(1, 1)
+                .setOverlay(OverlayTexture.NO_OVERLAY).setLight(LightCoordsUtil.FULL_BRIGHT)
+                .setNormal(entry, 0, 1, 0);
+        buffer.addVertex(entry, 1, 0, 0).setColor(WHITE).setUv(0, 1)
+                .setOverlay(OverlayTexture.NO_OVERLAY).setLight(LightCoordsUtil.FULL_BRIGHT)
+                .setNormal(entry, 0, 1, 0);
     }
 
     public static void queueVboRebuildsForChunkUpdate(int sectionX, int sectionY, int sectionZ, Set<BlockEntity> blockEntities) {
@@ -132,5 +155,16 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
                 ties.geometry.needsRebuild = true;
             }
         }
+    }
+
+    public static class TrackTiesRenderState extends BlockEntityRenderState {
+        public TrackTiesBlockEntity trackTies;
+        public Pose pose;
+        public float clientTime;
+        public double estimatedTrackLength;
+        public TrackTiesBlockEntity next;
+        public TrackTiesBlockEntity prev;
+        public TrackType nextType;
+        public int power;
     }
 }

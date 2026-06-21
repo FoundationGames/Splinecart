@@ -1,9 +1,9 @@
 package io.github.foundationgames.splinecart.config;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,23 +25,23 @@ public class Config extends ArrayList<ConfigOption<?>> {
         this.path = path;
     }
 
-    public <S extends CommandSource> LiteralArgumentBuilder<S> command(LiteralArgumentBuilder<S> cmd, BiConsumer<S, Text> feedbackSender) {
+    public <S> LiteralArgumentBuilder<S> command(LiteralArgumentBuilder<S> cmd, BiConsumer<S, Component> feedbackSender) {
         for (var opt : this) {
             cmd.then(
                     LiteralArgumentBuilder.<S>literal(opt.key)
                             .then(
-                                    opt.<S>commandArg("value").executes(context -> {
+                                     opt.<S>commandArg("value").executes(context -> {
                                         opt.setFromCommandAndSave(context, "value");
                                         feedbackSender.accept(context.getSource(),
-                                                Text.translatable(VALUE_SET_KEY, opt.key, opt.get()));
+                                                Component.translatable(VALUE_SET_KEY, opt.key, opt.get()));
                                         return 0;
                                     })
                             ).executes(context -> {
                                 var descKey = String.format("splinecart.config.%s.%s.desc", this.id, opt.key);
                                 feedbackSender.accept(context.getSource(),
-                                        Text.translatable(VALUE_QUERY_KEY, opt.key, opt.get()));
+                                        Component.translatable(VALUE_QUERY_KEY, opt.key, opt.get()));
                                 feedbackSender.accept(context.getSource(),
-                                        Text.translatable(descKey).formatted(Formatting.GRAY));
+                                        Component.translatable(descKey).withStyle(ChatFormatting.GRAY));
                                 return 0;
                             })
             );
