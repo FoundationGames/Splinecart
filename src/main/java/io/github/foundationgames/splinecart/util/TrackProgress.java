@@ -2,46 +2,46 @@ package io.github.foundationgames.splinecart.util;
 
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.entity.data.TrackedDataHandler;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.network.syncher.EntityDataSerializer;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3d;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
 
 public record TrackProgress(BlockPos startBlock, Pose startPose, BlockPos endBlock, Pose endPose, boolean orientationOnly, double t) {
-    public static final PacketCodec<ByteBuf, TrackProgress> PACKET_CODEC = PacketCodec.tuple(
-            BlockPos.PACKET_CODEC, TrackProgress::startBlock,
+    public static final StreamCodec<ByteBuf, TrackProgress> PACKET_CODEC = StreamCodec.composite(
+            BlockPos.STREAM_CODEC, TrackProgress::startBlock,
             Pose.PACKET_CODEC, TrackProgress::startPose,
-            BlockPos.PACKET_CODEC, TrackProgress::endBlock,
+            BlockPos.STREAM_CODEC, TrackProgress::endBlock,
             Pose.PACKET_CODEC, TrackProgress::endPose,
-            PacketCodecs.BOOL, TrackProgress::orientationOnly,
-            PacketCodecs.DOUBLE, TrackProgress::t,
+            ByteBufCodecs.BOOL, TrackProgress::orientationOnly,
+            ByteBufCodecs.DOUBLE, TrackProgress::t,
             TrackProgress::new
     );
 
-    public static final TrackedDataHandler<TrackProgress> DATA_HANDLER = TrackedDataHandler.create(PACKET_CODEC);
+    public static final EntityDataSerializer<TrackProgress> DATA_HANDLER = EntityDataSerializer.forValueType(PACKET_CODEC);
 
     public static TrackProgress of(TrackTiesBlockEntity e, double t) {
         var next = e.next();
 
-        var nextPos = e.getPos();
+        var nextPos = e.getBlockPos();
         var nextPose = e.pose();
 
         if (next != null) {
-            nextPos = next.getPos();
+            nextPos = next.getBlockPos();
             nextPose = next.pose();
         }
 
-        return new TrackProgress(e.getPos(), e.pose(), nextPos, nextPose, false, t);
+        return new TrackProgress(e.getBlockPos(), e.pose(), nextPos, nextPose, false, t);
     }
 
-    public static TrackProgress empty(Vec3d pos) {
-        var bpos = BlockPos.ofFloored(pos);
-        var pose = new Pose(new Vector3d(pos.getX(), pos.getY(), pos.getZ()), new Matrix3d());
+    public static TrackProgress empty(Vec3 pos) {
+        var bpos = BlockPos.containing(pos);
+        var pose = new Pose(new Vector3d(pos.x(), pos.y(), pos.z()), new Matrix3d());
         return new TrackProgress(bpos, pose, bpos, pose, true, 0);
     }
 
@@ -50,7 +50,7 @@ public record TrackProgress(BlockPos startBlock, Pose startPose, BlockPos endBlo
             return false;
         }
 
-        double t = MathHelper.lerp(delta, prev.t(), t());
+        double t = Mth.lerp(delta, prev.t(), t());
 
         if (!prev.orientationOnly()) {
             if (prev.startBlock().equals(startBlock()) && prev.endBlock().equals(endBlock())) {

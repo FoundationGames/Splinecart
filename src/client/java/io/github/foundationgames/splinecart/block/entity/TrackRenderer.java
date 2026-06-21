@@ -3,20 +3,18 @@ package io.github.foundationgames.splinecart.block.entity;
 import io.github.foundationgames.splinecart.TrackType;
 import io.github.foundationgames.splinecart.block.TrackTiesBlockEntity;
 import io.github.foundationgames.splinecart.util.Pose;
-import net.minecraft.client.gl.VertexBuffer;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.VertexFormat;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.MultiBufferSource;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import net.minecraft.client.renderer.LevelRenderer;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3d;
 import org.joml.Vector3d;
@@ -26,7 +24,7 @@ import org.joml.Vector3fc;
 import java.util.function.Function;
 
 public enum TrackRenderer {;
-    public static int renderTrack(MatrixStack.Entry trackTransform, MatrixStack.Entry overlayTransform,
+    public static int renderTrack(PoseStack.Pose trackTransform, PoseStack.Pose overlayTransform,
                                       @Nullable BufferProvider trackBuffer, @Nullable BufferProvider overlayBuffer,
                                       int overlay, int light, int segs, float overlayVOffset, Vector3fc overlayColor,
                                       TrackTiesBlockEntity curr, TrackTiesBlockEntity prevE, TrackTiesBlockEntity nextE) {
@@ -38,7 +36,7 @@ public enum TrackRenderer {;
 
         if (nextE != null) {
             var end = nextE.pose();
-            var world = curr.getWorld();
+            var world = curr.getLevel();
 
             var trackType = curr.nextType();
 
@@ -76,8 +74,8 @@ public enum TrackRenderer {;
         return status;
     }
 
-    public static boolean renderTrackOverlay(MatrixStack.Entry transform, BufferProvider overlayBuffer,
-                                          int overlay, int segs, Pose start, Pose end, World world,
+    public static boolean renderTrackOverlay(PoseStack.Pose transform, BufferProvider overlayBuffer,
+                                          int overlay, int segs, Pose start, Pose end, Level world,
                                           Vector3d origin, Matrix3d basis, Vector3d deriv,
                                           float vOffset, Vector3fc color,
                                           TrackType trackType, TrackTiesBlockEntity curr, TrackTiesBlockEntity next) {
@@ -101,7 +99,7 @@ public enum TrackRenderer {;
         return false;
     }
 
-    private static void renderExtraTrackEnd(MatrixStack.Entry transform, VertexConsumer buffer, Pose pose,
+    private static void renderExtraTrackEnd(PoseStack.Pose transform, VertexConsumer buffer, Pose pose,
                                             int overlay, int light,
                                             TrackTiesBlockEntity prevE, TrackTiesBlockEntity nextE) {
         if ((prevE == null) ^ (nextE == null)) {
@@ -117,17 +115,17 @@ public enum TrackRenderer {;
                 v1 = 0;
             }
 
-            var matrices = new MatrixStack();
-            matrices.push();
-            matrices.peek().getNormalMatrix().set(transform.getNormalMatrix());
-            matrices.peek().getPositionMatrix().set(transform.getPositionMatrix());
+            var matrices = new PoseStack();
+            matrices.pushPose();
+            matrices.last().normal().set(transform.normal());
+            matrices.last().pose().set(transform.pose());
 
             var tl = pose.translation();
             matrices.translate(tl.x(), tl.y(), tl.z());
 
-            var entry = matrices.peek();
-            var posMat = entry.getPositionMatrix();
-            var nmlMat = entry.getNormalMatrix();
+            var entry = matrices.last();
+            var posMat = entry.pose();
+            var nmlMat = entry.normal();
             for (int x = 0; x < 3; x++) {
                 for (int y = 0; y < 3; y++) {
                     posMat.setRowColumn(x, y, (float) pose.basis().getRowColumn(x, y));
@@ -135,17 +133,17 @@ public enum TrackRenderer {;
                 }
             }
 
-            buffer.vertex(entry, 0.5f, 0, z0).color(TrackTiesBlockEntityRenderer.WHITE).texture(0.25f, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);
-            buffer.vertex(entry, -0.5f, 0, z0).color(TrackTiesBlockEntityRenderer.WHITE).texture(0, v0).overlay(overlay).light(light).normal(entry, 0, 1, 0);
+            buffer.addVertex(entry, 0.5f, 0, z0).setColor(TrackTiesBlockEntityRenderer.WHITE).setUv(0.25f, v0).setOverlay(overlay).setLight(light).setNormal(entry, 0, 1, 0);
+            buffer.addVertex(entry, -0.5f, 0, z0).setColor(TrackTiesBlockEntityRenderer.WHITE).setUv(0, v0).setOverlay(overlay).setLight(light).setNormal(entry, 0, 1, 0);
 
-            buffer.vertex(entry, -0.5f, 0, z1).color(TrackTiesBlockEntityRenderer.WHITE).texture(0, v1).overlay(overlay).light(light).normal(entry, 0, 1, 0);
-            buffer.vertex(entry, 0.5f, 0, z1).color(TrackTiesBlockEntityRenderer.WHITE).texture(0.25f, v1).overlay(overlay).light(light).normal(entry, 0, 1, 0);
+            buffer.addVertex(entry, -0.5f, 0, z1).setColor(TrackTiesBlockEntityRenderer.WHITE).setUv(0, v1).setOverlay(overlay).setLight(light).setNormal(entry, 0, 1, 0);
+            buffer.addVertex(entry, 0.5f, 0, z1).setColor(TrackTiesBlockEntityRenderer.WHITE).setUv(0.25f, v1).setOverlay(overlay).setLight(light).setNormal(entry, 0, 1, 0);
 
-            matrices.pop();
+            matrices.popPose();
         }
     }
 
-    private static void renderPart(World world, MatrixStack.Entry entry, VertexConsumer buffer, Pose start, Pose end,
+    private static void renderPart(Level world, PoseStack.Pose entry, VertexConsumer buffer, Pose start, Pose end,
                                    float u0, float u1, float vOffset, Vector3fc color, double t0, double t1, double[] blockProgress,
                                    Vector3d origin0, Matrix3d basis0, Vector3d deriv0, int overlay) {
         start.interpolate(end, t0, origin0, basis0, deriv0);
@@ -166,27 +164,27 @@ public enum TrackRenderer {;
         v1 = 1 - v1 + vOffset;
         v0 = 1 - v0 + vOffset;
 
-        var pos0 = new BlockPos(MathHelper.floor(origin0.x()), MathHelper.floor(origin0.y()), MathHelper.floor(origin0.z()));
-        var pos1 = new BlockPos(MathHelper.floor(origin1.x()), MathHelper.floor(origin1.y()), MathHelper.floor(origin1.z()));
+        var pos0 = new BlockPos(Mth.floor(origin0.x()), Mth.floor(origin0.y()), Mth.floor(origin0.z()));
+        var pos1 = new BlockPos(Mth.floor(origin1.x()), Mth.floor(origin1.y()), Mth.floor(origin1.z()));
 
-        int light0 = WorldRenderer.getLightmapCoordinates(world, pos0);
-        int light1 = WorldRenderer.getLightmapCoordinates(world, pos1);
+        int light0 = LevelRenderer.getLightCoords(world, pos0);
+        int light1 = LevelRenderer.getLightCoords(world, pos1);
 
         var point = new Vector3f();
 
         point.set(0.5, 0, 0).mul(basis0).add((float) origin0.x(), (float) origin0.y(), (float) origin0.z());
-        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u0, v0).overlay(overlay)
-                .light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
+        buffer.addVertex(entry, point).setColor(color.x(), color.y(), color.z(), 1).setUv(u0, v0).setOverlay(overlay)
+                .setLight(light0).setNormal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
         point.set(-0.5, 0, 0).mul(basis0).add((float) origin0.x(), (float) origin0.y(), (float) origin0.z());
-        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u1, v0).overlay(overlay)
-                .light(light0).normal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
+        buffer.addVertex(entry, point).setColor(color.x(), color.y(), color.z(), 1).setUv(u1, v0).setOverlay(overlay)
+                .setLight(light0).setNormal(entry, (float) norm0.x(), (float) norm0.y(), (float) norm0.z());
 
         point.set(-0.5, 0, 0).mul(basis1).add((float) origin1.x(), (float) origin1.y(), (float) origin1.z());
-        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u1, v1).overlay(overlay)
-                .light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
+        buffer.addVertex(entry, point).setColor(color.x(), color.y(), color.z(), 1).setUv(u1, v1).setOverlay(overlay)
+                .setLight(light1).setNormal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
         point.set(0.5, 0, 0).mul(basis1).add((float) origin1.x(), (float) origin1.y(), (float) origin1.z());
-        buffer.vertex(entry, point).color(color.x(), color.y(), color.z(), 1).texture(u0, v1).overlay(overlay)
-                .light(light1).normal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
+        buffer.addVertex(entry, point).setColor(color.x(), color.y(), color.z(), 1).setUv(u0, v1).setOverlay(overlay)
+                .setLight(light1).setNormal(entry, (float) norm1.x(), (float) norm1.y(), (float) norm1.z());
     }
 
     public interface BufferProvider {
@@ -195,15 +193,15 @@ public enum TrackRenderer {;
         boolean end();
     }
 
-    public static BufferProvider immediateBuf(VertexConsumerProvider source, Identifier texture, Function<Identifier, RenderLayer> renderType) {
+    public static BufferProvider immediateBuf(MultiBufferSource source, Identifier texture, Function<Identifier, RenderType> renderType) {
         return new ImmediateBufferProvider(source, texture, renderType);
     }
 
-    public static BufferProvider vboBuf(VertexBuffer vbo, Tessellator tessellator) {
-        return new VboBufferProvider(vbo, tessellator);
+    public static BufferProvider vboBuf(Object vbo, Object tessellator) {
+        return null;
     }
 
-    public record ImmediateBufferProvider(VertexConsumerProvider source, Identifier texture, Function<Identifier, RenderLayer> renderType) implements BufferProvider {
+    public record ImmediateBufferProvider(MultiBufferSource source, Identifier texture, Function<Identifier, RenderType> renderType) implements BufferProvider {
         @Override
         public VertexConsumer buffer() {
             return source.getBuffer(renderType().apply(texture()));
@@ -215,37 +213,15 @@ public enum TrackRenderer {;
         }
     }
 
-    public static class VboBufferProvider implements BufferProvider {
-        public final VertexBuffer vbo;
-        public final Tessellator tessellator;
-        private BufferBuilder buffer = null;
-
-        public VboBufferProvider(VertexBuffer vbo, Tessellator tessellator) {
-            this.vbo = vbo;
-            this.tessellator = tessellator;
-        }
-
+    public record DirectBufferProvider(VertexConsumer buffer) implements BufferProvider {
         @Override
         public VertexConsumer buffer() {
-            this.buffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
-            return this.buffer;
+            return buffer;
         }
 
         @Override
         public boolean end() {
-            if (buffer != null) {
-                var built = buffer.endNullable();
-
-                if (built != null) {
-                    vbo.bind();
-                    vbo.upload(built);
-                    VertexBuffer.unbind();
-
-                    return true;
-                }
-            }
-
-            return false;
+            return true;
         }
     }
 }

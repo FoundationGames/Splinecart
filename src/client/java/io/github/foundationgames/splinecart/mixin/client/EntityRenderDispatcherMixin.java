@@ -2,58 +2,79 @@ package io.github.foundationgames.splinecart.mixin.client;
 
 import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
 import io.github.foundationgames.splinecart.util.SUtil;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderDispatcher;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.entity.Entity;
 import org.joml.Quaternionf;
-import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.Map;
+import java.util.WeakHashMap;
 
 @Mixin(EntityRenderDispatcher.class)
 public class EntityRenderDispatcherMixin {
-    @Unique private boolean onTrackFollower = false;
-    @Inject(method = "render(Lnet/minecraft/entity/Entity;DDDFLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/EntityRenderer;)V",
-            at = @At(value = "INVOKE", shift = At.Shift.BEFORE, ordinal = 0, target = "Lnet/minecraft/client/render/entity/EntityRenderer;render(Lnet/minecraft/client/render/entity/state/EntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"))
-    private void splinecart$rotateEntitiesOnTrackFollower(Entity entity, double x, double y, double z, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, EntityRenderer<?, ?> renderer, CallbackInfo info) {
-        if (entity instanceof TrackFollowerEntity) return;
+    @Unique
+    private final Map<EntityRenderState, Entity> splinecart$stateToEntity = new WeakHashMap<>();
+
+    @Unique
+    private boolean onTrackFollower = false;
+
+    @Inject(method = "extractEntity", at = @At("RETURN"))
+    private <E extends Entity> void splinecart$captureEntity(E entity, float partialTick, CallbackInfoReturnable<EntityRenderState> info) {
+        splinecart$stateToEntity.put(info.getReturnValue(), entity);
+    }
+
+    @Inject(method = "submit",
+            at = @At(value = "INVOKE", shift = At.Shift.BEFORE, target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;submit"))
+    private void splinecart$rotateEntitiesOnTrackFollower(EntityRenderState state, CameraRenderState camera, double x, double y, double z, PoseStack poseStack, SubmitNodeCollector nodeCollector, CallbackInfo info) {
+        Entity entity = splinecart$stateToEntity.get(state);
+        if (entity == null || entity instanceof TrackFollowerEntity) return;
 
         Entity vehicle = entity;
         while (vehicle != null) {
             vehicle = vehicle.getVehicle();
 
             if (vehicle instanceof TrackFollowerEntity trackFollower) {
+                float tickDelta = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
                 var rotation = new Quaternionf();
                 trackFollower.getClientOrientation(rotation, tickDelta);
 
-                matrices.push();
+                poseStack.pushPose();
                 onTrackFollower = true;
 
-                var dv3d = entity.getLerpedPos(tickDelta).subtract(trackFollower.getLerpedPos(tickDelta));
-                var diff = new Vector3d(dv3d.getX(), dv3d.getY(), dv3d.getZ());
-                matrices.translate(-diff.x(), -diff.y(), -diff.z());
+                // The passenger and its TrackFollower are interpolated independently by
+                // vanilla. Their render-time difference therefore contains a timing error
+                // proportional to speed; rotating that error as a passenger offset makes
+                // the cart visibly swing from side to side.
+                var renderOffset = entity.getPosition(tickDelta).subtract(trackFollower.getLerpedPosition(tickDelta));
+                var passengerOffset = entity.position().subtract(trackFollower.position());
+                poseStack.translate(-renderOffset.x, -renderOffset.y, -renderOffset.z);
 
-                matrices.multiply(rotation);
+                poseStack.mulPose(rotation);
 
-                matrices.translate(diff.x(), diff.y(), diff.z());
-                matrices.multiply(SUtil.BACKWARDS);
+                poseStack.translate(passengerOffset.x, passengerOffset.y, passengerOffset.z);
+                poseStack.mulPose(SUtil.BACKWARDS);
 
                 return;
             }
         }
     }
 
-    @Inject(method = "render(Lnet/minecraft/entity/Entity;DDDFLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;ILnet/minecraft/client/render/entity/EntityRenderer;)V",
-            at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lnet/minecraft/client/render/entity/EntityRenderer;render(Lnet/minecraft/client/render/entity/state/EntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"))
-    private void splinecart$undoTransform(Entity entity, double x, double y, double z, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, EntityRenderer<?, ?> renderer, CallbackInfo info) {
+    @Inject(method = "submit",
+            at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Lnet/minecraft/client/renderer/entity/EntityRenderer;submit"))
+    private void splinecart$undoTransform(EntityRenderState state, CameraRenderState camera, double x, double y, double z, PoseStack poseStack, SubmitNodeCollector nodeCollector, CallbackInfo info) {
         if (onTrackFollower) {
             onTrackFollower = false;
-            matrices.pop();
+            poseStack.popPose();
         }
     }
 }
