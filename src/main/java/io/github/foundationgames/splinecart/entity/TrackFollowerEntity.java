@@ -15,6 +15,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
@@ -100,6 +101,27 @@ public class TrackFollowerEntity extends Entity {
         }
 
         return null;
+    }
+
+    public static @Nullable TrackFollowerEntity createPlaced(Level world, BlockPos startTie, double progress) {
+        var startE = TrackTiesBlockEntity.of(world, startTie);
+        var endE = startE != null ? startE.next() : null;
+        if (startE == null || endE == null) {
+            return null;
+        }
+
+        var follower = new TrackFollowerEntity(world);
+        follower.trackVelocity = 0.0;
+        follower.splinePieceProgress = Mth.clamp(progress, 0.0, 1.0);
+        follower.setStretch(startTie, endE.getBlockPos());
+
+        var position = new Vector3d();
+        var derivative = new Vector3d();
+        startE.pose().interpolate(endE.pose(), follower.splinePieceProgress, position, follower.basis, derivative);
+        follower.motionScale = derivative.lengthSquared() > 1.0e-8 ? 1.0 / derivative.length() : 0.0;
+        follower.setPos(position.x(), position.y(), position.z());
+        follower.getEntityData().set(TRACK_PROGRESS, TrackProgress.of(startE, follower.splinePieceProgress));
+        return follower;
     }
 
     public void setStretch(@Nullable BlockPos start, @Nullable BlockPos end) {

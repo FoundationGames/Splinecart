@@ -3,6 +3,8 @@ package io.github.foundationgames.splinecart.block;
 import com.mojang.serialization.MapCodec;
 import io.github.foundationgames.splinecart.item.TrackItem;
 import io.github.foundationgames.splinecart.util.Pose;
+import io.github.foundationgames.splinecart.util.SplineSegment;
+import io.github.foundationgames.splinecart.entity.TrackFollowerEntity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -10,12 +12,25 @@ import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.MinecartItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -27,6 +42,8 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.AxisAngle4d;
 import org.joml.Matrix3d;
 import org.joml.Vector3d;
+
+import java.util.ArrayList;
 
 public class TrackTiesBlock extends DirectionalBlock implements EntityBlock {
     public static final MapCodec<TrackTiesBlock> CODEC = simpleCodec(TrackTiesBlock::new);
@@ -110,6 +127,98 @@ public class TrackTiesBlock extends DirectionalBlock implements EntityBlock {
         }
 
         return super.useWithoutItem(state, world, pos, player, hit);
+    }
+
+    @Override
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level world, BlockPos pos,
+                                          Player player, InteractionHand hand, BlockHitResult hit) {
+        if (!(stack.getItem() instanceof MinecartItem) ||
+                !(world.getBlockEntity(pos) instanceof TrackTiesBlockEntity tie)) {
+            return super.useItemOn(stack, state, world, pos, player, hand, hit);
+        }
+
+        var segment = nearestStraightSegment(tie, hit);
+        var cartType = minecartType(stack.getItem());
+        if (segment == null || cartType == null) {
+            return super.useItemOn(stack, state, world, pos, player, hand, hit);
+        }
+
+        if (world.isClientSide()) {
+            return InteractionResult.SUCCESS;
+        }
+
+        var hitPoint = new Vector3d(hit.getLocation().x(), hit.getLocation().y(), hit.getLocation().z());
+        double progress = segment.nearestStraightProgress(hitPoint);
+        var spawn = new Vector3d();
+        var basis = new Matrix3d();
+        var tangent = new Vector3d();
+        segment.interpolate(progress, spawn, basis, tangent);
+        tangent.normalize();
+
+        var cart = AbstractMinecart.createMinecart(world, spawn.x(), spawn.y(), spawn.z(), cartType,
+                EntitySpawnReason.SPAWN_ITEM_USE, stack, player);
+        if (cart == null) {
+            return InteractionResult.FAIL;
+        }
+
+        float yaw = (float) Math.toDegrees(Math.atan2(-tangent.x(), tangent.z()));
+        cart.absSnapRotationTo(yaw, 0.0f);
+
+        // Ignore the thin clicked rail base, but reject blocks occupying the cart body.
+        AABB body = cart.getBoundingBox();
+        body = new AABB(body.minX, spawn.y() + 0.125, body.minZ, body.maxX, body.maxY, body.maxZ);
+        if (!world.noCollision(cart, body) || !world.getEntities(cart, cart.getBoundingBox(), Entity::isPickable).isEmpty()) {
+            return InteractionResult.FAIL;
+        }
+
+        var follower = TrackFollowerEntity.createPlaced(world, segment.start().getBlockPos(), progress);
+        if (follower == null || !(world instanceof ServerLevel serverLevel)) {
+            return InteractionResult.FAIL;
+        }
+
+        serverLevel.addFreshEntity(follower);
+        serverLevel.addFreshEntity(cart);
+        cart.startRiding(follower, true, false);
+        stack.consume(1, player);
+        serverLevel.playSound(null, BlockPos.containing(spawn.x(), spawn.y(), spawn.z()),
+                SoundEvents.METAL_PLACE, SoundSource.BLOCKS, 1.0f, 1.0f);
+        serverLevel.gameEvent(GameEvent.ENTITY_PLACE, BlockPos.containing(spawn.x(), spawn.y(), spawn.z()),
+                GameEvent.Context.of(player, state));
+        return InteractionResult.SUCCESS;
+    }
+
+    private static @Nullable SplineSegment nearestStraightSegment(TrackTiesBlockEntity tie, BlockHitResult hit) {
+        var candidates = new ArrayList<SplineSegment>(2);
+        var next = tie.next();
+        if (next != null) candidates.add(new SplineSegment(tie, next));
+        var prev = tie.prev();
+        if (prev != null) candidates.add(new SplineSegment(prev, tie));
+
+        var point = new Vector3d(hit.getLocation().x(), hit.getLocation().y(), hit.getLocation().z());
+        SplineSegment nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (var candidate : candidates) {
+            if (!candidate.isStraightHorizontal()) continue;
+            double t = candidate.nearestStraightProgress(point);
+            var position = new Vector3d();
+            candidate.interpolate(t, position, new Matrix3d(), new Vector3d());
+            double distance = position.distanceSquared(point);
+            if (distance < nearestDistance) {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
+    private static @Nullable EntityType<? extends AbstractMinecart> minecartType(Item item) {
+        if (item == Items.MINECART) return EntityType.MINECART;
+        if (item == Items.CHEST_MINECART) return EntityType.CHEST_MINECART;
+        if (item == Items.FURNACE_MINECART) return EntityType.FURNACE_MINECART;
+        if (item == Items.TNT_MINECART) return EntityType.TNT_MINECART;
+        if (item == Items.HOPPER_MINECART) return EntityType.HOPPER_MINECART;
+        if (item == Items.COMMAND_BLOCK_MINECART) return EntityType.COMMAND_BLOCK_MINECART;
+        return null;
     }
 
     public Pose getPose(BlockState state, BlockPos pos) {

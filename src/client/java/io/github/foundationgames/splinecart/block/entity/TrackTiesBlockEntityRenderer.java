@@ -29,6 +29,8 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
     public static final Identifier TRACK_TEXTURE = Splinecart.id("textures/track.png");
     public static final Identifier TRACK_OVERLAY_TEXTURE = Splinecart.id("textures/track_overlay.png");
     public static final Identifier POSE_TEXTURE_DEBUG = Splinecart.id("textures/debug.png");
+    public static final Identifier SLEEPER_TEXTURE = Identifier.withDefaultNamespace("textures/block/oak_planks.png");
+    public static final Identifier CONNECTOR_TEXTURE = Identifier.withDefaultNamespace("textures/block/cauldron_side.png");
 
     public TrackTiesBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {
     }
@@ -93,6 +95,13 @@ public class TrackTiesBlockEntityRenderer implements BlockEntityRenderer<TrackTi
                     0, overlayColor,
                     state.trackTies, state.prev, state.next);
         });
+
+        if (state.next != null) {
+            nodeCollector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(SLEEPER_TEXTURE), (entry, buffer) ->
+                    TrackSupportRenderer.renderSleepers(entry, buffer, OverlayTexture.NO_OVERLAY, segs, state.trackTies, state.next));
+            nodeCollector.submitCustomGeometry(poseStack, RenderTypes.entityCutout(CONNECTOR_TEXTURE), (entry, buffer) ->
+                    TrackSupportRenderer.renderConnectors(entry, buffer, OverlayTexture.NO_OVERLAY, segs, state.trackTies, state.next));
+        }
 
         // Render overlay
         if (state.next != null && state.nextType.overlay != null) {
