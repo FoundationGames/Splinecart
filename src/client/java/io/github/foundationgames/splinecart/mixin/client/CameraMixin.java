@@ -53,6 +53,12 @@ public abstract class CameraMixin {
             at = @At(value = "INVOKE", shift = At.Shift.AFTER, ordinal = 0, target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;", remap = false))
     private void splinecart$updateCamRotationWhileRiding(float yaw, float pitch, CallbackInfo info) {
         var self = this.focusedEntity;
+        if (self == null) {
+            // Camera#setRotation is also called by cameras that never went through
+            // Camera#update and therefore have no focused entity, such as the scene
+            // camera Create's Ponder screens render through.
+            return;
+        }
         var vehicle = self.getVehicle();
         var tickDelta = MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(false);
         if (vehicle != null) {
